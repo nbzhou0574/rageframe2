@@ -11,6 +11,7 @@ use common\components\CurdTrait;
  *
  * Class ConfigCateController
  * @package backend\modules\sys\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class ConfigCateController extends SController
 {
@@ -29,7 +30,7 @@ class ConfigCateController extends SController
     public function actionIndex()
     {
         $models = ConfigCate::find()
-            ->orderBy('sort Asc,created_at Asc')
+            ->orderBy('sort asc, created_at asc')
             ->asArray()
             ->all();
 
@@ -39,13 +40,13 @@ class ConfigCateController extends SController
     }
 
     /**
-     * 编辑/新增
+     * 编辑/创建
      *
      * @return array|mixed|string|yii\web\Response
      */
-    public function actionEdit()
+    public function actionAjaxEdit()
     {
-        $request  = Yii::$app->request;
+        $request = Yii::$app->request;
         $id = $request->get('id');
         $model = $this->findModel($id);
         $model->level = $request->get('level', null) ?? $model->level; // 级别
@@ -55,7 +56,7 @@ class ConfigCateController extends SController
         {
             if ($request->isAjax)
             {
-                Yii::$app->response->format = yii\web\Response::FORMAT_JSON;
+                Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
                 return \yii\widgets\ActiveForm::validate($model);
             }
 
@@ -64,7 +65,7 @@ class ConfigCateController extends SController
                 : $this->message($this->analyErr($model->getFirstErrors()), $this->redirect(['index']), 'error');
         }
 
-        return $this->renderAjax('edit', [
+        return $this->renderAjax('ajax-edit', [
             'model' => $model,
             'parent_title' => $request->get('parent_title', '无'),
         ]);

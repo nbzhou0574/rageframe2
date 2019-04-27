@@ -1,9 +1,7 @@
 <?php
 namespace common\models\wechat;
 
-use Yii;
 use common\enums\StatusEnum;
-use yii\web\NotFoundHttpException;
 
 /**
  * This is the model class for table "{{%wechat_msg_history}}".
@@ -238,6 +236,16 @@ class MsgHistory extends \common\models\common\BaseModel
      */
     public function getFans()
     {
-        return $this->hasOne(Fans::className(), ['openid' => 'openid']);
+        return $this->hasOne(Fans::class, ['openid' => 'openid']);
+    }
+
+    /**
+     * 关联规则
+     *
+     * @return \yii\db\ActiveQuery
+     */
+    public function getRule()
+    {
+        return $this->hasOne(Rule::class, ['id' => 'rule_id']);
     }
 }

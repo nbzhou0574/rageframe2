@@ -48,7 +48,11 @@ return [
             'targets' => [
                 [
                     'class' => 'yii\log\FileTarget',
+                    // 日志存储到数据库
+                    // 'class' => 'yii\log\DbTarget',
+                    // 'logTable' => '{{%sys_log}}',
                     'levels' => ['error', 'warning'],
+                    'logFile' => '@runtime/logs/' . date('Y-m/d') . '.log',
                 ],
             ],
         ],
@@ -82,12 +86,16 @@ return [
             'bundles' => [
                 'yii\web\JqueryAsset' => [
                     'sourcePath' => null,
-                    'js' => [
-                        '/backend/resources/js/jquery.min.js?2.1.4',
-                    ]
+                    'js' => []
                 ],
             ],
-        ]
+        ],
+        'response' => [
+            'class' => 'yii\web\Response',
+            'on beforeSend' => function($event) {
+                Yii::$app->services->errorLog->record($event->sender);
+            },
+        ],
     ],
     'controllerMap' => [
         // 文件上传公共控制器
@@ -100,9 +108,9 @@ return [
         'provinces' => [
             'class' => 'backend\widgets\provinces\ProvincesController',
         ],
-        // 插件渲染默认控制器
-        'addons' => [
-            'class' => 'common\controllers\AddonsController',
+        // 微信资源选择
+        'selector' => [
+            'class' => 'backend\widgets\selector\SelectorController',
         ],
     ],
     'params' => $params,

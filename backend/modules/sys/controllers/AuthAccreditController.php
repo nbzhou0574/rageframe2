@@ -1,16 +1,17 @@
 <?php
 namespace backend\modules\sys\controllers;
 
-use common\helpers\ResultDataHelper;
 use yii;
 use common\models\sys\AuthItem;
 use common\helpers\ArrayHelper;
+use common\helpers\ResultDataHelper;
 
 /**
  * RBAC权限控制器
  *
  * Class AuthAccreditController
  * @package backend\modules\sys\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class AuthAccreditController extends SController
 {
@@ -23,12 +24,12 @@ class AuthAccreditController extends SController
     {
         $models = AuthItem::find()
             ->where(['type' => AuthItem::AUTH])
-            ->asArray()
             ->orderBy('sort asc')
+            ->asArray()
             ->all();
 
         return $this->render('index', [
-            'models' => ArrayHelper::itemsMerge($models, 'key', 0, 'parent_key'),
+            'models' => ArrayHelper::itemsMerge($models, 0, 'key', 'parent_key'),
         ]);
     }
 
@@ -43,9 +44,8 @@ class AuthAccreditController extends SController
         $name = $request->get('name');
         $model = $this->findModel($name);
         // 父级key
-        $model->level = $request->get('level', 1);// 等级
         $model->parent_key = $request->get('parent_key', 0);
-        $model->type = AuthItem::AUTH;
+        $model->level = $request->get('level', 1);
 
         if ($model->load($request->post()))
         {
@@ -62,16 +62,9 @@ class AuthAccreditController extends SController
             }
         }
 
-        $parent_name = "暂无";
-        if ($model->parent_key != 0)
-        {
-            $prent = AuthItem::find()->where(['key' => $model->parent_key])->one();
-            $parent_name = $prent['description'];
-        }
-
         return $this->renderAjax('ajax-edit', [
             'model' => $model,
-            'parent_name' => $parent_name,
+            'parent_title' => $request->get('parent_title', '无'),
         ]);
     }
 
@@ -96,40 +89,29 @@ class AuthAccreditController extends SController
     /**
      * 更新排序/状态字段
      *
+     * @param $id
      * @return array
      */
-    public function actionAjaxUpdate()
+    public function actionAjaxUpdate($id)
     {
-        $data = Yii::$app->request->get();
-        $insertData  = [];
-        foreach (['sort', 'status', 'id'] as $item)
+        if (!($model = AuthItem::findOne(['key' => $id])))
         {
-            if (isset($data[$item]))
-            {
-                $insertData[$item] = $data[$item];
-            }
+            return ResultDataHelper::json(404, '找不到数据');
         }
 
-        unset($data);
-
-        if (!($model = AuthItem::findOne(['key' => $insertData['id']])))
-        {
-            return ResultDataHelper::result(404, '找不到数据');
-        }
-
-        $model->attributes = $insertData;
+        $model->attributes = ArrayHelper::filter(Yii::$app->request->get(), ['key', 'sort', 'status']);
         if (!$model->save())
         {
-            return ResultDataHelper::result(422, $this->analyErr($model->getFirstErrors()));
+            return ResultDataHelper::json(422, $this->analyErr($model->getFirstErrors()));
         }
 
-        return ResultDataHelper::result(200, '修改成功');
+        return ResultDataHelper::json(200, '修改成功');
     }
 
     /**
      * 返回模型
      *
-     * @param $id
+     * @param $name
      * @return mixed
      */
     protected function findModel($name)
@@ -137,7 +119,10 @@ class AuthAccreditController extends SController
         if (empty($name) || empty(($model = AuthItem::findOne($name))))
         {
             $model = new AuthItem();
-            return $model->loadDefaultValues();
+            $model = $model->loadDefaultValues();
+            $model->type = AuthItem::AUTH;
+
+            return $model;
         }
 
         return $model;

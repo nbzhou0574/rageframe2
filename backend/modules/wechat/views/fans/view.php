@@ -3,15 +3,16 @@ use common\models\wechat\Fans;
 ?>
 
 <div class="modal-header">
-    <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">×</span><span class="sr-only">关闭</span></button>
+    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+        <span aria-hidden="true">×</span></button>
     <h4 class="modal-title">详细信息</h4>
 </div>
 <div class="modal-body">
     <table class="table text-center">
         <tbody>
         <tr>
-            <td class="feed-element">
-                <img src="<?= $model->head_portrait ?>" class="img-circle">
+            <td class="feed-element" >
+                <img src="<?= $model->head_portrait ?>" class="img-circle img-bordered-sm" width="48" height="48">
             </td>
             <td><?= $model['nickname']?></td>
         </tr>
@@ -26,7 +27,7 @@ use common\models\wechat\Fans;
         <tr>
             <td>是否关注</td>
             <td>
-                <?php if($model->follow == Fans::FOLLOW_OFF){ ?>
+                <?php if ($model->follow == Fans::FOLLOW_OFF){ ?>
                     <span class="label label-danger">已取消</span>
                 <?php }else{ ?>
                     <span class="label label-info">已关注</span>
@@ -36,7 +37,7 @@ use common\models\wechat\Fans;
         <tr>
             <td>关注/取消时间</td>
             <td>
-                <?php if($model->follow == Fans::FOLLOW_OFF){ ?>
+                <?php if ($model->follow == Fans::FOLLOW_OFF){ ?>
                     <?= Yii::$app->formatter->asDatetime($model->unfollowtime) ?>
                 <?php }else{ ?>
                     <?= Yii::$app->formatter->asDatetime($model->followtime) ?>

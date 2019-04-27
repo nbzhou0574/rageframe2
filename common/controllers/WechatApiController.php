@@ -14,6 +14,7 @@ use common\models\wechat\QrcodeStat;
  *
  * Class WechatApiController
  * @package common\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class WechatApiController extends BaseController
 {
@@ -27,8 +28,12 @@ class WechatApiController extends BaseController
     /**
      * 处理微信消息
      *
-     * @return array|bool|mixed
+     * @return array|mixed
      * @throws NotFoundHttpException
+     * @throws \EasyWeChat\Kernel\Exceptions\BadRequestException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \ReflectionException
      */
     public function actionIndex()
     {
@@ -38,15 +43,13 @@ class WechatApiController extends BaseController
         {
             // 激活公众号
             case 'GET':
-                if(WechatHelper::verifyToken($request->get('signature'), $request->get('timestamp'), $request->get('nonce')))
+                if (WechatHelper::verifyToken($request->get('signature'), $request->get('timestamp'), $request->get('nonce')))
                 {
                     return $request->get('echostr');
                 }
 
                 throw new NotFoundHttpException('签名验证失败.');
-
                 break;
-
             // 接收数据
             case 'POST':
                 $app = Yii::$app->wechat->getApp();
@@ -85,11 +88,8 @@ class WechatApiController extends BaseController
                 // 将响应输出
                 $response = $app->server->serve();
                 $response->send();
-
                 break;
-
             default:
-
                 throw new NotFoundHttpException('所请求的页面不存在.');
         }
 
@@ -102,8 +102,9 @@ class WechatApiController extends BaseController
      * @param $message
      * @return bool|mixed
      * @throws NotFoundHttpException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
      */
-    public function event($message)
+    protected function event($message)
     {
         Yii::$app->params['msgHistory']['event'] = $message['Event'];
 
@@ -137,6 +138,8 @@ class WechatApiController extends BaseController
                 break;
             // 上报地理位置事件
             case 'LOCATION' :
+
+                //TODO 暂时不处理
 
                 break;
             // 自定义菜单(点击)事件

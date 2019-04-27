@@ -2,6 +2,7 @@
 namespace wechat\controllers;
 
 use Yii;
+use common\components\WechatLoginTrait;
 use common\controllers\BaseController;
 
 /**
@@ -9,41 +10,31 @@ use common\controllers\BaseController;
  *
  * Class WController
  * @package wechat\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class WController extends BaseController
 {
-    /**
-     * 默认检测到微信进入自动获取用户信息
-     *
-     * @var bool
-     */
-    protected $_openGetWechatUser = true;
+    use WechatLoginTrait;
 
     /**
      * @throws \yii\base\InvalidConfigException
      */
     public function init()
     {
-        // 可在此处加入自己私有的微信配置
-
         parent::init();
 
-        /** 检测到微信进入自动获取用户信息 **/
-        if ($this->_openGetWechatUser && Yii::$app->wechat->isWechat && !Yii::$app->wechat->isAuthorized())
+        if (!Yii::$app->wechat->isWechat)
         {
-            return Yii::$app->wechat->authorizeRequired()->send();
+            // die('请用微信打开');
         }
 
-        /** 当前进入微信用户信息 **/
-        Yii::$app->params['wechatMember'] = json_decode(Yii::$app->session->get('wechatUser'), true);
+        // 修改微信授权方式为静默授权
+        // Yii::$app->params['wechatConfig']['oauth']['scopes'] = ['snsapi_base'];
 
-        /** 非微信网页打开时候开启模拟数据 **/
-        if (empty(Yii::$app->params['wechatMember']) && Yii::$app->params['simulateUser']['switch'] == true)
-        {
-            Yii::$app->params['wechatMember'] = Yii::$app->params['simulateUser']['userInfo'];
-        }
+        // 开启微信模拟数据
+        Yii::$app->params['simulateUser']['switch'] = true;
 
-        // 查询用户并进行登录
-        // TODO 判断登录
+        // 微信登录
+        $this->login();
     }
 }

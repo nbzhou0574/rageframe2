@@ -1,16 +1,17 @@
 <?php
 namespace backend\modules\sys\controllers;
 
-use common\helpers\ArrayHelper;
 use Yii;
-use backend\modules\sys\models\Database;
+use common\helpers\ArrayHelper;
 use common\helpers\ResultDataHelper;
+use backend\modules\sys\models\Database;
 
 /**
  * 数据备份还原
  *
  * Class DataBaseController
  * @package backend\modules\sys\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class DataBaseController extends SController
 {
@@ -72,7 +73,7 @@ class DataBaseController extends SController
         $tables = Yii::$app->request->post('tables');
         if (empty($tables))
         {
-            return ResultDataHelper::result(404, '请选择要备份的表');
+            return ResultDataHelper::json(404, '请选择要备份的表');
         }
 
         // 读取备份配置
@@ -82,7 +83,7 @@ class DataBaseController extends SController
         $lock = "{$config['path']}" . $config['lock'];
         if (is_file($lock))
         {
-            return ResultDataHelper::result(404, '检测到有一个备份任务正在执行，请稍后或清理缓存后再试');
+            return ResultDataHelper::json(404, '检测到有一个备份任务正在执行，请稍后或清理缓存后再试');
         }
 
         // 创建锁文件
@@ -91,7 +92,7 @@ class DataBaseController extends SController
         // 检查备份目录是否可写
         if (!is_writeable($config['path']))
         {
-            return ResultDataHelper::result(404, '备份目录不存在或不可写，请检查后重试！');
+            return ResultDataHelper::json(404, '备份目录不存在或不可写，请检查后重试！');
         }
 
         // 生成备份文件信息
@@ -113,13 +114,13 @@ class DataBaseController extends SController
 
             $tab = ['id' => 0, 'start' => 0];
 
-            return ResultDataHelper::result(200, '初始化成功！', [
+            return ResultDataHelper::json(200, '初始化成功！', [
                 'tables' => $tables,
                 'tab' => $tab
             ]);
         }
 
-        return ResultDataHelper::result(404, '初始化失败，备份文件创建失败！');
+        return ResultDataHelper::json(404, '初始化失败，备份文件创建失败！');
     }
 
     /**
@@ -140,17 +141,17 @@ class DataBaseController extends SController
         // 备份指定表
         $database = new Database($file,$config);
         $start = $database->backup($tables[$id], $start);
-        if($start === false)
+        if ($start === false)
         {
-            return ResultDataHelper::result(404, '备份出错！');
+            return ResultDataHelper::json(404, '备份出错！');
         }
-        else if ($start === 0)
+        elseif ($start === 0)
         {
             // 下一表
-            if(isset($tables[++$id]))
+            if (isset($tables[++$id]))
             {
                 $tab = ['id' => $id, 'start' => 0];
-                return ResultDataHelper::result(200, '备份完成', [
+                return ResultDataHelper::json(200, '备份完成', [
                     'tablename' => $tables[--$id],
                     'achieveStatus' => 0,
                     'tab' => $tab,
@@ -162,7 +163,7 @@ class DataBaseController extends SController
             Yii::$app->session->set('backup_tables', null);
             Yii::$app->session->set('backup_file', null);
             Yii::$app->session->set('backup_config', null);
-            return ResultDataHelper::result(200, '备份完成', [
+            return ResultDataHelper::json(200, '备份完成', [
                 'tablename' => $tables[--$id],
                 'achieveStatus' => 1
             ]);
@@ -172,7 +173,7 @@ class DataBaseController extends SController
             $tab = ['id' => $id, 'start' => $start[0]];
             $rate = floor(100 * ($start[0] / $start[1]));
             // 对下一个表进行备份
-            return ResultDataHelper::result(200, "正在备份...({$rate}%)", [
+            return ResultDataHelper::json(200, "正在备份...({$rate}%)", [
                 'tablename' => $tables[$id],
                 'achieveStatus' => 0,
                 'tab' => $tab,
@@ -192,7 +193,7 @@ class DataBaseController extends SController
         $tables = Yii::$app->request->post('tables', '');
         if (!$tables)
         {
-            return ResultDataHelper::result(404, '请指定要优化的表！');
+            return ResultDataHelper::json(404, '请指定要优化的表！');
         }
 
         // 判断是否是数组
@@ -201,20 +202,20 @@ class DataBaseController extends SController
             $tables = implode('`,`', $tables);
             if (Yii::$app->db->createCommand("OPTIMIZE TABLE `{$tables}`")->queryAll())
             {
-                return ResultDataHelper::result(200, '数据表优化完成');
+                return ResultDataHelper::json(200, '数据表优化完成');
             }
 
-            return ResultDataHelper::result(404, '数据表优化出错请重试！');
+            return ResultDataHelper::json(404, '数据表优化出错请重试！');
         }
 
         $list = Yii::$app->db->createCommand("REPAIR TABLE `{$tables}`")->queryOne();
         // 判断是否成功
         if ($list['Msg_text'] == "OK")
         {
-            return ResultDataHelper::result(200, "数据表'{$tables}'优化完成！");
+            return ResultDataHelper::json(200, "数据表'{$tables}'优化完成！");
         }
 
-        return ResultDataHelper::result(404, "数据表'{$tables}'优化出错！错误信息:". $list['Msg_text']);
+        return ResultDataHelper::json(404, "数据表'{$tables}'优化出错！错误信息:" . $list['Msg_text']);
     }
 
     /**
@@ -226,10 +227,10 @@ class DataBaseController extends SController
      */
     public function actionRepair()
     {
-        $tables = Yii::$app->request->post('tables','');
+        $tables = Yii::$app->request->post('tables', '');
         if (!$tables)
         {
-            return ResultDataHelper::result(404, '请指定要修复的表！');
+            return ResultDataHelper::json(404, '请指定要修复的表！');
         }
 
         // 判断是否是数组
@@ -238,19 +239,19 @@ class DataBaseController extends SController
             $tables = implode('`,`', $tables);
             if (Yii::$app->db->createCommand("REPAIR TABLE `{$tables}`")->queryAll())
             {
-                return ResultDataHelper::result(200, '数据表修复化完成');
+                return ResultDataHelper::json(200, '数据表修复化完成');
             }
 
-            return ResultDataHelper::result(404, '数据表修复出错请重试！');
+            return ResultDataHelper::json(404, '数据表修复出错请重试！');
         }
 
         $list = Yii::$app->db->createCommand("REPAIR TABLE `{$tables}`")->queryOne();
         if ($list['Msg_text'] == "OK")
         {
-            return ResultDataHelper::result(200, "数据表'{$tables}'修复完成！");
+            return ResultDataHelper::json(200, "数据表'{$tables}'修复完成！");
         }
 
-        return ResultDataHelper::result(404, "数据表'{$tables}'修复出错！错误信息:". $list['Msg_text']);
+        return ResultDataHelper::json(404, "数据表'{$tables}'修复出错！错误信息:" . $list['Msg_text']);
     }
 
     /********************************************************************************/
@@ -281,7 +282,7 @@ class DataBaseController extends SController
                 $time = "{$name[3]}:{$name[4]}:{$name[5]}";
                 $part = $name[6];
 
-                if(isset($list["{$date} {$time}"]))
+                if (isset($list["{$date} {$time}"]))
                 {
                     $info = $list["{$date} {$time}"];
                     $info['part'] = max($info['part'], $part);
@@ -317,8 +318,8 @@ class DataBaseController extends SController
 
         $config = $this->config;
         // 获取备份文件信息
-        $name  = date('Ymd-His', $time) . '-*.sql*';
-        $path  = realpath($config['path']) . DIRECTORY_SEPARATOR . $name;
+        $name = date('Ymd-His', $time) . '-*.sql*';
+        $path = realpath($config['path']) . DIRECTORY_SEPARATOR . $name;
         $files = glob($path);
 
         $list = [];
@@ -340,17 +341,20 @@ class DataBaseController extends SController
         {
             // 缓存备份列表
             Yii::$app->session->set('backup_list', $list);
-            return ResultDataHelper::result(200, '初始化完成', [
+            return ResultDataHelper::json(200, '初始化完成', [
                 'part' => 1,
                 'start' => 0,
             ]);
         }
 
-        return ResultDataHelper::result(200, "备份文件可能已经损坏，请检查！");
+        return ResultDataHelper::json(200, "备份文件可能已经损坏，请检查！");
     }
 
     /**
      * 开始还原到数据库
+     *
+     * @return array
+     * @throws \yii\db\Exception
      */
     public function actionRestoreStart()
     {
@@ -371,14 +375,14 @@ class DataBaseController extends SController
 
         if ($start === false)
         {
-            return ResultDataHelper::result(200, "备份文件可能已经损坏，请检查！");
+            return ResultDataHelper::json(200, "备份文件可能已经损坏，请检查！");
         }
-        else if($start === 0)
+        elseif ($start === 0)
         {
             // 下一卷
             if (isset($list[++$part]))
             {
-                return ResultDataHelper::result(200, "正在还原...#{$part}", [
+                return ResultDataHelper::json(200, "正在还原...#{$part}", [
                     'part' => $part,
                     'start1' => $start,
                     'start' => 0,
@@ -387,21 +391,21 @@ class DataBaseController extends SController
             }
 
             Yii::$app->session->set('backup_list', null);
-            return ResultDataHelper::result(200, "还原完成");
+            return ResultDataHelper::json(200, "还原完成");
         }
         else
         {
-            if($start[1])
+            if ($start[1])
             {
                 $rate = floor(100 * ($start[0] / $start[1]));
-                return ResultDataHelper::result(200, "正在还原...#{$part} ({$rate}%)", [
+                return ResultDataHelper::json(200, "正在还原...#{$part} ({$rate}%)", [
                     'part' => $part,
                     'start' => $start[0],
                     'achieveStatus' => 0,
                 ]);
             }
 
-            return ResultDataHelper::result(200, "正在还原...#{$part}", [
+            return ResultDataHelper::json(200, "正在还原...#{$part}", [
                 'part' => $part,
                 'start' => $start[0],
                 'gz' => 1,
@@ -423,7 +427,7 @@ class DataBaseController extends SController
         array_map("unlink", glob($path));
         if (count(glob($path)))
         {
-            return $this->message('文件删除失败，请检查权限!', $this->redirect(['restore']),'error');
+            return $this->message('文件删除失败，请检查权限!', $this->redirect(['restore']), 'error');
         }
 
         return $this->message('文件删除成功', $this->redirect(['restore']));
@@ -493,6 +497,6 @@ class DataBaseController extends SController
             $i++;
         }
 
-        return ResultDataHelper::result(200, '返回成功', ['str' => $str]) ;
+        return ResultDataHelper::json(200, '返回成功', ['str' => $str]) ;
     }
 }

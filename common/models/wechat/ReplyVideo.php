@@ -31,8 +31,8 @@ class ReplyVideo extends \yii\db\ActiveRecord
         return [
             [['rule_id'], 'integer'],
             [['title', 'description', 'media_id'], 'required'],
-            [['title'], 'string', 'max' => 50],
-            [['description', 'media_id'], 'string', 'max' => 255],
+            [['title', 'media_id'], 'string', 'max' => 50],
+            [['description'], 'string', 'max' => 255],
         ];
     }
 
@@ -48,5 +48,25 @@ class ReplyVideo extends \yii\db\ActiveRecord
             'description' => '说明',
             'media_id' => '视频',
         ];
+    }
+
+    /**
+     * 关联素材
+     *
+     * @return \yii\db\ActiveQuery
+     */
+    public function getAttachment()
+    {
+        return $this->hasOne(Attachment::class, ['media_id' => 'media_id']);
+    }
+
+    /**
+     * 关联规则
+     *
+     * @return \yii\db\ActiveQuery
+     */
+    public function getRule()
+    {
+        return $this->hasOne(Rule::class, ['id' => 'rule_id']);
     }
 }

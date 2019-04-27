@@ -4,7 +4,8 @@ use yii\helpers\Url;
 ?>
 
 <div class="modal-header">
-    <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">×</span><span class="sr-only">关闭</span></button>
+    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+        <span aria-hidden="true">×</span></button>
     <h4 class="modal-title">基本信息</h4>
 </div>
 <div class="modal-body">
@@ -50,7 +51,7 @@ use yii\helpers\Url;
         <tr>
             <td>状态</td>
             <td>
-                <?php if($model['pay_status'] == \common\enums\StatusEnum::ENABLED){ ?>
+                <?php if ($model['pay_status'] == \common\enums\StatusEnum::ENABLED){ ?>
                     <span class="label label-primary">支付成功</span>
                 <?php }else{ ?>
                     <span class="label label-danger">未支付</span>

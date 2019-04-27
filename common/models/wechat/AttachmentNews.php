@@ -1,8 +1,6 @@
 <?php
-
 namespace common\models\wechat;
 
-use Yii;
 use yii\helpers\Url;
 
 /**
@@ -42,8 +40,8 @@ class AttachmentNews extends \common\models\common\BaseModel
         return [
             [['attachment_id', 'show_cover_pic', 'sort', 'status', 'created_at', 'updated_at'], 'integer'],
             [['content'], 'string'],
-            [['title'], 'string', 'max' => 50],
-            [['thumb_media_id', 'thumb_url', 'digest', 'content_source_url', 'media_url'], 'string', 'max' => 255],
+            [['title', 'thumb_media_id'], 'string', 'max' => 50],
+            [['thumb_url', 'digest', 'content_source_url', 'media_url'], 'string', 'max' => 200],
             [['author'], 'string', 'max' => 64],
         ];
     }
@@ -61,14 +59,14 @@ class AttachmentNews extends \common\models\common\BaseModel
             'thumb_url' => '缩略图 Url',
             'author' => '作者',
             'digest' => 'Digest',
-            'show_cover_pic' => 'Show Cover Pic',
-            'content' => 'Content',
-            'content_source_url' => 'Content Source Url',
+            'show_cover_pic' => '封面',
+            'content' => '内容',
+            'content_source_url' => '外链',
             'media_url' => '资源 Url',
             'sort' => '排序',
             'status' => '状态',
-            'created_at' => 'Created At',
-            'updated_at' => 'Updated At',
+            'created_at' => '创建时间',
+            'updated_at' => '更新时间',
         ];
     }
 
@@ -134,5 +132,13 @@ class AttachmentNews extends \common\models\common\BaseModel
         }
 
         return $model;
+    }
+
+    /**
+     * 关联素材
+     */
+    public function getAttachment()
+    {
+        return $this->hasOne(Attachment::class, ['id' => 'attachment_id']);
     }
 }

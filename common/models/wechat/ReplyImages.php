@@ -29,7 +29,7 @@ class ReplyImages extends \yii\db\ActiveRecord
         return [
             [['rule_id'], 'integer'],
             [['media_id'], 'required'],
-            [['media_id'], 'string', 'max' => 255],
+            [['media_id'], 'string', 'max' => 50],
         ];
     }
 
@@ -45,7 +45,6 @@ class ReplyImages extends \yii\db\ActiveRecord
         ];
     }
 
-
     /**
      * 关联素材
      *
@@ -53,6 +52,16 @@ class ReplyImages extends \yii\db\ActiveRecord
      */
     public function getAttachment()
     {
-        return $this->hasOne(Attachment::className(), ['media_id' => 'media_id']);
+        return $this->hasOne(Attachment::class, ['media_id' => 'media_id']);
+    }
+
+    /**
+     * 关联规则
+     *
+     * @return \yii\db\ActiveQuery
+     */
+    public function getRule()
+    {
+        return $this->hasOne(Rule::class, ['id' => 'rule_id']);
     }
 }

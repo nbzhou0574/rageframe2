@@ -34,7 +34,7 @@ cd rageframe2
 3、安装依赖
 
 ```
-php composer.phar install
+php composer.phar install 
 ```
 
 4、初始化项目
@@ -79,8 +79,8 @@ php composer.phar update
 
 后台地址：当前域名/backend
 
-微信地址：当前域名/wechat/
+微信地址：当前域名/wechat
 
-Api地址：当前域名/api/
+Api地址：当前域名/api
 
 

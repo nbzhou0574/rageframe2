@@ -12,6 +12,7 @@ use common\components\CurdTrait;
  *
  * Class MenuController
  * @package backend\modules\sys\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class MenuController extends SController
 {
@@ -37,41 +38,43 @@ class MenuController extends SController
             ->all();
 
         return $this->render('index', [
-            'models' => ArrayHelper::itemsMerge($models, 'id'),
+            'models' => ArrayHelper::itemsMerge($models),
             'cate_id' => $cate_id,
             'cates' => MenuCate::getList(),
         ]);
     }
 
     /**
-     * 编辑/新增
+     * 编辑/创建
      *
      * @return array|mixed|string|\yii\web\Response
      */
-    public function actionEdit()
+    public function actionAjaxEdit()
     {
-        $request  = Yii::$app->request;
+        $request = Yii::$app->request;
         $id = $request->get('id');
 
         $model = $this->findModel($id);
         $model->level = $request->get('level', null) ?? $model->level; // 级别
         $model->pid = $request->get('pid', null) ?? $model->pid; // 父id
         $model->cate_id = $request->get('cate_id', 0) ?? $model->cate_id; // 分类id
+        $model->params = unserialize($model->params);
 
         if ($model->load($request->post()))
         {
             if ($request->isAjax)
             {
-                Yii::$app->response->format = yii\web\Response::FORMAT_JSON;
+                Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
                 return \yii\widgets\ActiveForm::validate($model);
             }
 
+            $model->params = serialize($model->params);
             return $model->save()
                 ? $this->redirect(['index', 'cate_id' => $model->cate_id])
                 : $this->message($this->analyErr($model->getFirstErrors()), $this->redirect(['index', 'cate_id' => $model->cate_id]), 'error');
         }
 
-        return $this->renderAjax('edit', [
+        return $this->renderAjax('ajax-edit', [
             'model' => $model,
             'parent_title' => $request->get('parent_title', '无'),
         ]);

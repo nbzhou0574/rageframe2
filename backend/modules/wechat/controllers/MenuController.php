@@ -3,7 +3,6 @@ namespace backend\modules\wechat\controllers;
 
 use Yii;
 use yii\data\Pagination;
-use yii\web\NotFoundHttpException;
 use common\models\wechat\Menu;
 use common\helpers\ResultDataHelper;
 use common\models\wechat\FansTags;
@@ -13,6 +12,7 @@ use common\models\wechat\FansTags;
  *
  * Class MenuController
  * @package backend\modules\wechat\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class MenuController extends WController
 {
@@ -20,33 +20,27 @@ class MenuController extends WController
      * 自定义菜单首页
      *
      * @return string
-     * @throws NotFoundHttpException
+     * @throws \EasyWeChat\Kernel\Exceptions\HttpException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \EasyWeChat\Kernel\Exceptions\RuntimeException
+     * @throws \Psr\SimpleCache\InvalidArgumentException
+     * @throws \yii\web\UnprocessableEntityHttpException
      */
     public function actionIndex()
     {
         $type = Yii::$app->request->get('type', Menu::TYPE_CUSTOM);
         $data = Menu::find()->where(['type' => $type]);
-        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->_pageSize]);
+        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->pageSize]);
         $models = $data->offset($pages->offset)
             ->orderBy('status desc, id desc')
             ->limit($pages->limit)
             ->all();
 
-        // 判断下权限
-        if (!$models)
-        {
-            try
-            {
-                // 查询下菜单
-                $this->app->menu->current();
-            }
-            catch (\Exception $e)
-            {
-                throw new NotFoundHttpException($e->getMessage());
-            }
-        }
+        // 查询下菜单
+        !$models && Yii::$app->debris->getWechatError(Yii::$app->wechat->app->menu->current());
 
-        return $this->render('index',[
+        return $this->render('index', [
             'pages' => $pages,
             'models' => $models,
             'type' => $type,
@@ -56,6 +50,14 @@ class MenuController extends WController
 
     /**
      * 创建菜单
+     *
+     * @return array|string
+     * @throws \EasyWeChat\Kernel\Exceptions\HttpException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \EasyWeChat\Kernel\Exceptions\RuntimeException
+     * @throws \Psr\SimpleCache\InvalidArgumentException
+     * @throws \yii\web\UnprocessableEntityHttpException
      */
     public function actionEdit()
     {
@@ -72,14 +74,15 @@ class MenuController extends WController
 
             if (!isset($postInfo['list']))
             {
-                return ResultDataHelper::result(422, '请添加菜单');
+                return ResultDataHelper::json(422, '请添加菜单');
             }
 
             $buttons = [];
             foreach ($postInfo['list'] as &$button)
             {
                 $arr = [];
-                if(isset($button['sub_button']))
+                // 判断是否有子菜单
+                if (isset($button['sub_button']))
                 {
                     $arr['name'] = $button['name'];
                     foreach ($button['sub_button'] as &$sub)
@@ -104,11 +107,11 @@ class MenuController extends WController
             // 判断写入是否成功
             if (!$model->validate())
             {
-                return ResultDataHelper::result(422, $this->analyErr($model->getFirstErrors()));
+                return ResultDataHelper::json(422, $this->analyErr($model->getFirstErrors()));
             }
 
             // 个性化菜单
-            if($model->type == Menu::TYPE_INDIVIDUATION)
+            if ($model->type == Menu::TYPE_INDIVIDUATION)
             {
                 $matchRule = [
                     "tag_id" => $model->tag_id,
@@ -120,29 +123,32 @@ class MenuController extends WController
                     "city" => trim($model->city),
                 ];
 
-                if (($menuResult = $this->app->menu->create($buttons, $matchRule)) && isset($menuResult['errcode'])) // 自定义菜单
+                // 创建自定义菜单
+                $menuResult = Yii::$app->wechat->app->menu->create($buttons, $matchRule);
+                if ($error = Yii::$app->debris->getWechatError($menuResult, false))
                 {
-                    return ResultDataHelper::result(422, $menuResult['errmsg']);
+                    return ResultDataHelper::json(422, $error);
                 }
 
                 $model->menu_id = $menuResult['menuid'];
                 $model->save();
 
-                return ResultDataHelper::result(200, "修改成功");
+                return ResultDataHelper::json(200, "修改成功");
             }
 
-            if (($menuResult = $this->app->menu->create($buttons)) && $menuResult['errcode'] != 0)
+            // 验证微信报错
+            if ($error = Yii::$app->debris->getWechatError(Yii::$app->wechat->app->menu->create($buttons), false))
             {
-                return ResultDataHelper::result(422, $menuResult['errmsg']);
+                return ResultDataHelper::json(422, $error);
             }
 
             // 判断写入是否成功
             if (!$model->save())
             {
-                return ResultDataHelper::result(422, $this->analyErr($model->getFirstErrors()));
+                return ResultDataHelper::json(422, $this->analyErr($model->getFirstErrors()));
             }
 
-            return ResultDataHelper::result(200, "修改成功");
+            return ResultDataHelper::json(200, "修改成功");
         }
 
         return $this->render('edit', [
@@ -168,7 +174,7 @@ class MenuController extends WController
         if ($model->delete())
         {
             // 个性化菜单删除
-            !empty($model['menu_id']) && $this->app->menu->delete($model['menu_id']);
+            !empty($model['menu_id']) && Yii::$app->wechat->app->menu->delete($model['menu_id']);
             return $this->message("删除成功", $this->redirect(['index', 'type' => $type]));
         }
 
@@ -179,7 +185,13 @@ class MenuController extends WController
      * 替换菜单为当前的菜单
      *
      * @param $id
-     * @return yii\web\Response
+     * @return mixed|\yii\web\Response
+     * @throws \EasyWeChat\Kernel\Exceptions\HttpException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \EasyWeChat\Kernel\Exceptions\RuntimeException
+     * @throws \Psr\SimpleCache\InvalidArgumentException
+     * @throws \yii\web\UnprocessableEntityHttpException
      */
     public function actionSave($id)
     {
@@ -189,7 +201,12 @@ class MenuController extends WController
             $model->save();
 
             // 创建微信菜单
-            $this->app->menu->create(unserialize($model->menu_data));
+            $createReturn = Yii::$app->wechat->app->menu->create(unserialize($model->menu_data));
+            // 解析微信接口是否报错
+            if ($error = Yii::$app->debris->getWechatError($createReturn, false))
+            {
+                return $this->message($error, $this->redirect(['index']), 'error');
+            }
         }
 
         return $this->redirect(['index']);
@@ -199,27 +216,31 @@ class MenuController extends WController
      * 同步菜单
      *
      * @return array
-     * @throws \Exception
+     * @throws \EasyWeChat\Kernel\Exceptions\HttpException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \EasyWeChat\Kernel\Exceptions\RuntimeException
+     * @throws \Psr\SimpleCache\InvalidArgumentException
+     * @throws \yii\web\UnprocessableEntityHttpException
      */
     public function actionSync()
     {
         // 获取菜单列表
-        $list = $this->app->menu->list();
+        $list = Yii::$app->wechat->app->menu->list();
         // 解析微信接口是否报错
-        Yii::$app->debris->analyWechatPortBack($list, false);
-        if ($error = Yii::$app->debris->getWechatPortBackError())
+        if ($error = Yii::$app->debris->getWechatError($list, false))
         {
-            return ResultDataHelper::result(404, $error);
+            return ResultDataHelper::json(404, $error);
         }
 
-        // 开始获取同步
+        // 开始获取自定义菜单同步
         if (!empty($list['menu']))
         {
             $model = new Menu;
             $model->title = "默认菜单";
             $model = $model->loadDefaultValues();
             $model->menu_data = serialize($list['menu']['button']);
-            $model->menu_id = $list['menu']['menuid'];
+            $model->menu_id = isset($list['menu']['menuid']) ? $list['menu']['menuid'] : '';
             $model->save();
         }
 
@@ -235,15 +256,16 @@ class MenuController extends WController
                 }
 
                 $model->title = "个性化菜单";
-                $model->type = Menu::TYPE_INDIVIDUATION;
                 $model->attributes = $menu['matchrule'];
+                $model->type = Menu::TYPE_INDIVIDUATION;
+                $model->tag_id = isset($menu['group_id']) ? $menu['group_id'] : '';
                 $model->menu_data = serialize($menu['button']);
                 $model->menu_id = $menu['menuid'];
                 $model->save();
             }
         }
 
-        return ResultDataHelper::result(200, '同步菜单成功');
+        return ResultDataHelper::json(200, '同步菜单成功');
     }
 
     /**

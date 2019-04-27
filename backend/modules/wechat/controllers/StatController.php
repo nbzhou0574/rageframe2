@@ -10,9 +10,10 @@ use common\models\wechat\FansStat;
 
 /**
  * 数据统计
- * 
+ *
  * Class StatController
  * @package backend\modules\wechat\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class StatController extends WController
 {
@@ -38,12 +39,12 @@ class StatController extends WController
         // 更新微信统计数据
         FansStat::getFansStat();
 
-        $request  = Yii::$app->request;
-        $from_date  = $request->get('from_date',date('Y-m-d',strtotime("-6 day")));
-        $to_date  = $request->get('to_date',date('Y-m-d'));
+        $request = Yii::$app->request;
+        $from_date = $request->get('from_date', date('Y-m-d', strtotime("-6 day")));
+        $to_date = $request->get('to_date',date('Y-m-d'));
 
         $models = FansStat::find()
-            ->where(['between','created_at',strtotime($from_date),strtotime($to_date)])
+            ->where(['between', 'created_at', strtotime($from_date), strtotime($to_date)])
             ->orderBy('created_at asc')
             ->asArray()
             ->all();
@@ -128,7 +129,7 @@ class StatController extends WController
             ->groupBy(['rule_id'])
             ->where(['between','created_at',strtotime($from_date),strtotime($to_date)]);
 
-        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->_pageSize]);
+        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->pageSize]);
         $models = $data->offset($pages->offset)
             ->with('rule')
             ->orderBy('updated_at desc')
@@ -150,16 +151,16 @@ class StatController extends WController
      */
     public function actionRuleKeyword()
     {
-        $request  = Yii::$app->request;
-        $from_date  = $request->get('from_date', date('Y-m-d', strtotime("-60 day")));
-        $to_date  = $request->get('to_date', date('Y-m-d', strtotime("+1 day")));
+        $request = Yii::$app->request;
+        $from_date = $request->get('from_date', date('Y-m-d', strtotime("-60 day")));
+        $to_date = $request->get('to_date', date('Y-m-d', strtotime("+1 day")));
 
         $data = RuleKeywordStat::find()
             ->select(['keyword_id','sum(hit) as hit','max(rule_id) as rule_id','max(updated_at) as updated_at'])
             ->groupBy(['keyword_id'])
             ->where(['between', 'created_at', strtotime($from_date), strtotime($to_date)]);
 
-        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->_pageSize]);
+        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->pageSize]);
         $models = $data->offset($pages->offset)
             ->with(['rule','ruleKeyword'])
             ->orderBy('updated_at desc')

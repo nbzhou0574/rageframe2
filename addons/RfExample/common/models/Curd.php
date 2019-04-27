@@ -1,6 +1,8 @@
 <?php
 namespace addons\RfExample\common\models;
 
+use common\models\member\MemberInfo;
+use common\models\sys\Manager;
 use Yii;
 use common\helpers\StringHelper;
 
@@ -53,12 +55,12 @@ class Curd extends \common\models\common\BaseModel
         return [
             [['cate_id', 'manager_id', 'sort', 'position', 'sex', 'views', 'status', 'created_at', 'updated_at'], 'integer'],
             [['title', 'content', 'covers', 'files', 'cover', 'file'], 'required'],
-            [['content', 'covers', 'files'], 'string'],
+            [['content', 'files'], 'string'],
             [['price'], 'number'],
             [['start_time', 'end_time'], 'safe'],
             [['title'], 'string', 'max' => 50],
-            [['cover', 'attachfile', 'keywords'], 'string', 'max' => 100],
-            [['description'], 'string', 'max' => 255],
+            [['cover', 'attachfile', 'keywords', 'tag'], 'string', 'max' => 100],
+            [['description'], 'string', 'max' => 200],
             [['email'], 'string', 'max' => 60],
             [['provinces', 'city', 'area'], 'integer'],
             [['ip'], 'string', 'max' => 16],
@@ -79,6 +81,7 @@ class Curd extends \common\models\common\BaseModel
             'position' => '推荐位',
             'sex' => '性别',
             'content' => '内容',
+            'tag' => '标签',
             'cover' => '封面',
             'covers' => '轮播图',
             'file' => '文件',
@@ -99,6 +102,16 @@ class Curd extends \common\models\common\BaseModel
             'created_at' => '创建时间',
             'updated_at' => '修改时间',
         ];
+    }
+
+    /**
+     * 关联当前用户
+     *
+     * @return \yii\db\ActiveQuery
+     */
+    public function getManager()
+    {
+        return $this->hasOne(Manager::class, ['id' => 'manager_id']);
     }
 
     /**

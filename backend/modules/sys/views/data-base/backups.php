@@ -1,64 +1,81 @@
 <?php
 use yii\helpers\Url;
+use common\helpers\AuthHelper;
 
 $this->title = '数据备份';
 $this->params['breadcrumbs'][] = ['label' =>  $this->title];
 ?>
 
-<div class="wrapper wrapper-content animated fadeInRight">
-    <div class="tabs-container">
-        <ul class="nav nav-tabs">
-            <li class="active"><a href="<?= Url::to(['backups'])?>"> 数据备份</a></li>
-            <li><a href="<?= Url::to(['restore'])?>"> 数据还原</a></li>
-        </ul>
-        <div class="tab-content">
-            <div class="tab-pane active">
-                <div class="panel-body">
-                    <div class="col-sm-12 m-b">
+<div class="row">
+    <div class="col-sm-12">
+        <div class="nav-tabs-custom">
+            <ul class="nav nav-tabs">
+                <li class="active"><a href="<?= Url::to(['backups'])?>"> 数据备份</a></li>
+                <li><a href="<?= Url::to(['restore'])?>"> 数据还原</a></li>
+            </ul>
+            <div class="tab-content">
+                <div class="active tab-pane">
+                    <div class="col-sm-12 normalPaddingJustV">
                         <div class="btn-group">
-                            <a class="btn btn-white table-list-database" href="javascript:;" data-type="1">立即备份</a>
-                            <a class="btn btn-white table-list-database" href="javascript:;" data-type="2">修复表</a>
-                            <a class="btn btn-white table-list-database" href="javascript:;" data-type="3">优化表</a>
-                            <a class="btn btn-white dictionary" href="javascript:;">Markdown数据字典</a>
+                            <!-- 权限校验 -->
+                            <?php if(AuthHelper::verify('/sys/data-base/export')){ ?>
+                                <a class="btn btn-white table-list-database" href="javascript:;" data-type="1">立即备份</a>
+                            <?php } ?>
+                            <!-- 权限校验 -->
+                            <?php if(AuthHelper::verify('/sys/data-base/repair')){ ?>
+                                <a class="btn btn-white table-list-database" href="javascript:;" data-type="2">修复表</a>
+                            <?php } ?>
+                            <!-- 权限校验 -->
+                            <?php if(AuthHelper::verify('/sys/data-base/optimize')){ ?>
+                                <a class="btn btn-white table-list-database" href="javascript:;" data-type="3">优化表</a>
+                            <?php } ?>
+                            <!-- 权限校验 -->
+                            <?php if(AuthHelper::verify('/sys/data-base/data-dictionary')){ ?>
+                                <a class="btn btn-white dictionary" href="javascript:;">Markdown数据字典</a>
+                            <?php } ?>
                         </div>
                     </div>
-                    <div class="col-sm-12">
-                        <table class="table table-hover">
-                            <thead>
-                            <tr>
-                                <th><input type="checkbox" checked="checked" class="check-all"></th>
-                                <th>表备注</th>
-                                <th>表名</th>
-                                <th>类型</th>
-                                <th>记录总数</th>
-                                <th>数据大小</th>
-                                <th>编码</th>
-                                <th>创建时间</th>
-                                <th>备份状态</th>
-                                <th>操作</th>
-                            </tr>
-                            </thead>
-                            <tbody id="list">
-                            <?php foreach($models as $model){ ?>
-                                <tr name = "<?= $model['name']?>">
-                                    <td><input type="checkbox" name="table[]" checked="checked" value="<?= $model['name']?>"></td>
-                                    <td><?= $model['comment']?></td>
-                                    <td><?= $model['name']?></td>
-                                    <td><?= $model['engine']?></td>
-                                    <td><?= $model['rows']?></td>
-                                    <td><?= Yii::$app->formatter->asShortSize($model['data_length'])?></td>
-                                    <td><?= $model['collation']?></td>
-                                    <td><?= $model['create_time']?></td>
-                                    <td id="<?= $model['name']?>">未备份</td>
-                                    <td>
+                    <table class="table table-hover">
+                        <thead>
+                        <tr>
+                            <th><input type="checkbox" checked="checked" class="check-all"></th>
+                            <th>表备注</th>
+                            <th>表名</th>
+                            <th>类型</th>
+                            <th>记录总数</th>
+                            <th>数据大小</th>
+                            <th>编码</th>
+                            <th>创建时间</th>
+                            <th>备份状态</th>
+                            <th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody id="list">
+                        <?php foreach($models as $model){ ?>
+                            <tr name = "<?= $model['name']?>">
+                                <td><input type="checkbox" name="table[]" checked="checked" value="<?= $model['name']?>"></td>
+                                <td><?= $model['comment']?></td>
+                                <td><?= $model['name']?></td>
+                                <td><?= $model['engine']?></td>
+                                <td><?= $model['rows']?></td>
+                                <td><?= Yii::$app->formatter->asShortSize($model['data_length'], 0)?></td>
+                                <td><?= $model['collation']?></td>
+                                <td><?= $model['create_time']?></td>
+                                <td id="<?= $model['name']?>">未备份</td>
+                                <td>
+                                    <!-- 权限校验 -->
+                                    <?php if(AuthHelper::verify('/sys/data-base/optimize')){ ?>
                                         <a href="#" class="table-list-optimize">优化表</a>
+                                    <?php } ?>
+                                    <!-- 权限校验 -->
+                                    <?php if(AuthHelper::verify('/sys/data-base/repair')){ ?>
                                         <a href="#" class="table-list-repair">修复表</a>
-                                    </td>
-                                </tr>
-                            <?php } ?>
-                            </tbody>
-                        </table>
-                    </div>
+                                    <?php } ?>
+                                </td>
+                            </tr>
+                        <?php } ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -67,7 +84,6 @@ $this->params['breadcrumbs'][] = ['label' =>  $this->title];
 
 <script type="text/javascript">
     $(document).ready(function(){
-
         var tablename = [];
         // dataType = 1:备份;2:修复;3:优化
         $(".table-list-database").click(function () {
@@ -108,7 +124,6 @@ $this->params['breadcrumbs'][] = ['label' =>  $this->title];
 
         // 备份表
         function Export(){
-
             tablename = [];
             $("#list :checkbox").each(function () {
                 if(this.checked){

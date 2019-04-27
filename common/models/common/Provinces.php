@@ -1,9 +1,7 @@
 <?php
-
 namespace common\models\common;
 
 use common\helpers\ArrayHelper;
-use Yii;
 
 /**
  * This is the model class for table "{{%common_provinces}}".
@@ -42,7 +40,7 @@ class Provinces extends \yii\db\ActiveRecord
             [['title', 'shortname'], 'string', 'max' => 50],
             [['pinyin'], 'string', 'max' => 100],
             [['lng', 'lat'], 'string', 'max' => 20],
-            [['position'], 'string', 'max' => 255],
+            [['position'], 'string', 'max' => 200],
             [['id'], 'unique'],
         ];
     }
@@ -59,12 +57,12 @@ class Provinces extends \yii\db\ActiveRecord
             'short_title' => '简称',
             'areacode' => 'Areacode',
             'zipcode' => 'Zipcode',
-            'pinyin' => 'Pinyin',
+            'pinyin' => '拼音',
             'lng' => 'Lng',
             'lat' => 'Lat',
-            'level' => 'Level',
+            'level' => '级别',
             'position' => 'Position',
-            'sort' => 'Sort',
+            'sort' => '排序',
         ];
     }
     /**
@@ -84,14 +82,37 @@ class Provinces extends \yii\db\ActiveRecord
 
     /**
      * 根据id获取区域名称
+     *
      * @param $id
      * @return mixed
      */
     public static function getCityName($id)
     {
-        if($provinces =  Provinces::findOne($id))
+        if ($provinces = Provinces::findOne($id))
         {
             return $provinces['title'];
+        }
+
+        return false;
+    }
+
+    /**
+     * 根据id数组获取区域名称
+     *
+     * @param $id
+     * @return mixed
+     */
+    public static function getCityListName(array $ids)
+    {
+        if($provinces =  Provinces::find()->where(['in', 'id', $ids])->all())
+        {
+            $address = '';
+            foreach ($provinces as $province)
+            {
+                $address .= $province['title'] . ' ';
+            }
+
+            return $address;
         }
 
         return false;

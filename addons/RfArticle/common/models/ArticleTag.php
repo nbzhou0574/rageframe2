@@ -1,6 +1,7 @@
 <?php
 namespace addons\RfArticle\common\models;
 
+use common\enums\StatusEnum;
 use Yii;
 
 /**
@@ -45,8 +46,8 @@ class ArticleTag extends \common\models\common\BaseModel
             'title' => '标题',
             'sort' => '排序',
             'status' => '状态',
-            'created_at' => 'Created At',
-            'updated_at' => 'Updated At',
+            'created_at' => '创建时间',
+            'updated_at' => '更新时间',
         ];
     }
 
@@ -57,6 +58,27 @@ class ArticleTag extends \common\models\common\BaseModel
      */
     public function getTagMap()
     {
-        return $this->hasOne(ArticleTagMap::className(), ['tag_id' => 'id']);
+        return $this->hasOne(ArticleTagMap::class, ['tag_id' => 'id']);
+    }
+
+    /**
+     * @return array
+     */
+    public static function getCheckTags()
+    {
+        // 文章标签
+        $articleTags = ArticleTag::find()
+            ->where(['status' => StatusEnum::ENABLED])
+            ->select(['id', 'title'])
+            ->asArray()
+            ->all();
+
+        $tags = [];
+        foreach ($articleTags as $tag)
+        {
+            $tags[$tag['id']] = $tag['title'];
+        }
+
+        return $tags;
     }
 }

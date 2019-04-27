@@ -3,11 +3,13 @@ namespace backend\models;
 
 use Yii;
 use common\models\sys\Manager;
-use yii\helpers\Html;
 
 /**
+ * 登录表单
+ *
  * Class LoginForm
  * @package backend\models
+ * @author jianyan74 <751393839@qq.com>
  */
 class LoginForm extends \common\models\common\LoginForm
 {
@@ -19,6 +21,11 @@ class LoginForm extends \common\models\common\LoginForm
      * @var int
      */
     public $attempts = 3;
+
+    /**
+     * @var bool
+     */
+    public $rememberMe = false;
 
     /**
      * @inheritdoc
@@ -48,20 +55,21 @@ class LoginForm extends \common\models\common\LoginForm
      * 验证ip地址是否正确
      *
      * @param $attribute
+     * @throws \yii\base\InvalidConfigException
      */
     public function validateIp($attribute)
     {
         $ip = Yii::$app->request->userIP;
-        $ipList = Yii::$app->debris->config('sys_allow_ip');
-        if (!empty($ipList))
+        $allowIp = Yii::$app->debris->config('sys_allow_ip');
+        if (!empty($allowIp))
         {
-            $value = explode(",", $ipList);
-            if (!in_array($ip, $value))
+            $ipList = explode(",", $allowIp);
+            if (!in_array($ip, $ipList))
             {
                 // 记录行为日志
-                Yii::$app->debris->log('login', '限制IP登录', false);
+                Yii::$app->services->sys->log('login', '限制IP登录', false);
 
-                $this->addError($attribute, '禁止登陆');
+                $this->addError($attribute, '登录失败');
             }
         }
     }
@@ -94,6 +102,7 @@ class LoginForm extends \common\models\common\LoginForm
      * 登陆
      *
      * @return bool
+     * @throws \yii\base\InvalidConfigException
      */
     public function login()
     {
@@ -105,7 +114,7 @@ class LoginForm extends \common\models\common\LoginForm
         }
 
         // 记录行为日志
-        Yii::$app->debris->log('login', '账号或者密码错误|用户名:' . $this->username, false);
+        Yii::$app->services->sys->log('login', '账号或者密码错误|用户名:' . $this->username, false);
 
         $counter = Yii::$app->session->get('loginCaptchaRequired') + 1;
         Yii::$app->session->set('loginCaptchaRequired', $counter);

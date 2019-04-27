@@ -1,48 +1,57 @@
 <?php
 namespace backend\modules\sys\controllers;
 
+use Yii;
 use yii\data\Pagination;
 use common\models\common\PayLog;
 use common\models\sys\ActionLog;
-use common\models\api\Log as ApiLog;
+use common\models\common\Log;
 
 /**
  * 日志控制器
  *
  * Class LogController
  * @package backend\modules\sys\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class LogController extends SController
 {
     /**
-     * api日志
+     * 报错日志
      *
      * @return string
      */
-    public function actionApi()
+    public function actionError()
     {
-        $data = ApiLog::find();
-        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->_pageSize]);
+        $error_code = Yii::$app->request->get('error_code', null);
+        $where = [];
+        $error_code == 1 && $where = ['<', 'error_code', 299];
+        $error_code == 2 && $where = ['>', 'error_code', 299];
+
+        $data = Log::find()->filterWhere($where);
+        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->pageSize]);
         $models = $data->offset($pages->offset)
+            ->with(['manager', 'member'])
             ->limit($pages->limit)
             ->orderBy('id desc')
             ->all();
 
         return $this->render($this->action->id, [
             'models' => $models,
-            'pages' => $pages
+            'pages' => $pages,
+            'error_code' => $error_code,
         ]);
     }
 
     /**
-     * api日志详情
+     * 报错日志详情
      *
      * @param $id
      * @return string
      */
-    public function actionApiView($id)
+    public function actionErrorView($id)
     {
-        $model = ApiLog::find()->where(['id' => $id])->one();
+        $model = Log::find()->where(['id' => $id])->one();
         return $this->renderAjax($this->action->id, [
             'model' => $model,
         ]);
@@ -56,8 +65,9 @@ class LogController extends SController
     public function actionAction()
     {
         $data = ActionLog::find();
-        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->_pageSize]);
+        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->pageSize]);
         $models = $data->offset($pages->offset)
+            ->with(['manager'])
             ->limit($pages->limit)
             ->orderBy('id desc')
             ->all();
@@ -89,8 +99,16 @@ class LogController extends SController
      */
     public function actionPay()
     {
-        $data = PayLog::find();
-        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->_pageSize]);
+        $pay_status = Yii::$app->request->get('pay_status', null);
+        $keyword = Yii::$app->request->get('keyword', null);
+
+        $data = PayLog::find()
+            ->filterWhere(['pay_status' => $pay_status])
+            ->andFilterWhere(['or',
+                ['like', 'order_sn', $keyword],
+                ['like', 'out_trade_no', $keyword]
+            ]);
+        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->pageSize]);
         $models = $data->offset($pages->offset)
             ->limit($pages->limit)
             ->orderBy('id desc')
@@ -98,7 +116,9 @@ class LogController extends SController
 
         return $this->render($this->action->id, [
             'models' => $models,
-            'pages' => $pages
+            'pages' => $pages,
+            'pay_status' => $pay_status,
+            'keyword' => $keyword,
         ]);
     }
 

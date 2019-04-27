@@ -46,11 +46,11 @@ class RuleStat extends \common\models\common\BaseModel
         return [
             'id' => 'ID',
             'rule_id' => 'Rule ID',
-            'rule_name' => 'Rule Name',
-            'hit' => 'Hit',
-            'status' => 'Status',
-            'created_at' => 'Created At',
-            'updated_at' => 'Updated At',
+            'rule_name' => '规则名称',
+            'hit' => '触发次数',
+            'status' => '状态',
+            'created_at' => '创建时间',
+            'updated_at' => '更新时间',
         ];
     }
 
@@ -85,7 +85,7 @@ class RuleStat extends \common\models\common\BaseModel
      */
     public function getRule()
     {
-        return $this->hasOne(Rule::className(),['id' => 'rule_id']);
+        return $this->hasOne(Rule::class,['id' => 'rule_id']);
     }
 
     /**
@@ -109,7 +109,7 @@ class RuleStat extends \common\models\common\BaseModel
     {
         return [
             [
-                'class' => TimestampBehavior::className(),
+                'class' => TimestampBehavior::class,
                 'attributes' => [
                     ActiveRecord::EVENT_BEFORE_INSERT => ['updated_at'],
                     ActiveRecord::EVENT_BEFORE_UPDATE => ['updated_at'],

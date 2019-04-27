@@ -2,57 +2,60 @@
 namespace common\controllers;
 
 use Yii;
+use yii\data\Pagination;
 use yii\web\Controller;
 use yii\filters\AccessControl;
-use common\helpers\StringHelper;
 use common\helpers\UploadHelper;
 use common\helpers\ResultDataHelper;
-use common\helpers\FileHelper;
+use common\enums\StatusEnum;
+use common\models\common\Attachment;
+use League\Flysystem\Adapter\Local;
+use League\Flysystem\Filesystem;
 
 /**
- * 文件上传控制器
- *
  * Class FileBaseController
  * @package common\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class FileBaseController extends Controller
 {
     /**
-     * 关闭csrf验证
+     * 关闭Csrf验证
      *
      * @var bool
      */
     public $enableCsrfValidation = false;
 
     /**
-     * 总切片大小
-     *
-     * @var
+     * @var int
      */
-    public $chunks;
+    protected $fileStart;
 
     /**
-     * 当前切片
-     *
-     * @var
+     * @var int
      */
-    public $chunk;
+    protected $fileEnd;
 
     /**
-     * 切片唯一ID
-     *
-     * @var
+     * @var int
      */
-    public $guid;
+    protected $fileNum = 0;
+
+    /**
+     * @var \League\Flysystem\Adapter\Local
+     */
+    protected $filesystem;
 
     /**
      * 行为控制
+     *
+     * @return array
      */
     public function behaviors()
     {
         return [
             'access' => [
-                'class' => AccessControl::className(),
+                'class' => AccessControl::class,
                 'rules' => [
                     [
                         'allow' => true,
@@ -61,18 +64,6 @@ class FileBaseController extends Controller
                 ],
             ],
         ];
-    }
-
-    /**
-     * @throws \yii\base\InvalidConfigException
-     */
-    public function init()
-    {
-        $this->chunks = Yii::$app->request->post('chunks', null);
-        $this->chunk = Yii::$app->request->post('chunk');
-        $this->guid = Yii::$app->request->post('guid', null);
-
-        parent::init();
     }
 
     /**
@@ -85,88 +76,15 @@ class FileBaseController extends Controller
     {
         try
         {
-            // 判断是否有切片上传直接接管
-            if ($this->chunks && $this->guid)
-            {
-                return ResultDataHelper::result(200, '上传成功', UploadHelper::chunks($this->guid, $this->chunk, $this->chunks, 'file', 'images'));
-            }
+            $upload = new UploadHelper(Yii::$app->request->post(), Attachment::UPLOAD_TYPE_IMAGES);
+            $upload->verifyFile();
+            $upload->save();
 
-            // 上传
-            $result = UploadHelper::upload('file', 'images');
-
-            // 创建缩略图
-            $thumb = Yii::$app->request->post('thumb', null);
-            if ($thumb && !empty($thumbArr = json_decode($thumb, true)))
-            {
-                foreach ($thumbArr as $value)
-                {
-                    FileHelper::mkdirs($result['thumbAbsolutePath']);
-                    $thumbPath = $result['thumbAbsolutePath'] . $result['name'];
-                    $thumbPath = StringHelper::createThumbUrl($thumbPath, $value['widget'], $value['height']);
-                    UploadHelper::createThumb($result['absolutePath'] . $result['name'], $thumbPath, $value['widget'], $value['height']);
-                }
-            }
-
-            return ResultDataHelper::result(200, '上传成功', [
-                'urlPath' => $result['relativePath'] . $result['name'],
-            ]);
+            return ResultDataHelper::json(200, '上传成功', $upload->getBaseInfo());
         }
         catch (\Exception $e)
         {
-            return ResultDataHelper::result(404, $e->getMessage());
-        }
-    }
-
-    /**
-     * 视频上传
-     *
-     * @return array
-     * @throws \yii\web\NotFoundHttpException
-     */
-    public function actionVideos()
-    {
-        try
-        {
-            // 判断是否有切片上传直接接管
-            if ($this->chunks && $this->guid)
-            {
-                return ResultDataHelper::result(200, '上传成功', UploadHelper::chunks($this->guid, $this->chunk, $this->chunks, 'file', 'videos'));
-            }
-
-            $result = UploadHelper::upload('file', 'videos');
-            return ResultDataHelper::result(200, '上传成功', [
-                'urlPath' => $result['relativePath'] . $result['name'],
-            ]);
-        }
-        catch (\Exception $e)
-        {
-            return ResultDataHelper::result(404, $e->getMessage());
-        }
-    }
-
-    /**
-     * 语音上传
-     *
-     * @return array
-     * @throws \yii\web\NotFoundHttpException
-     */
-    public function actionVoices()
-    {
-        try
-        {
-            if ($this->chunks && $this->guid)
-            {
-                return ResultDataHelper::result(200, '上传成功', UploadHelper::chunks($this->guid, $this->chunk, $this->chunks, 'file', 'voices'));
-            }
-
-            $result = UploadHelper::upload('file', 'voices');
-            return ResultDataHelper::result(200, '上传成功', [
-                'urlPath' => $result['relativePath'] . $result['name'],
-            ]);
-        }
-        catch (\Exception $e)
-        {
-            return ResultDataHelper::result(404, $e->getMessage());
+            return ResultDataHelper::json(404, $e->getMessage());
         }
     }
 
@@ -180,73 +98,243 @@ class FileBaseController extends Controller
     {
         try
         {
-            if ($this->chunks && $this->guid)
-            {
-                return ResultDataHelper::result(200, '上传成功', UploadHelper::chunks($this->guid, $this->chunk, $this->chunks, 'file', 'files'));
-            }
+            $upload = new UploadHelper(Yii::$app->request->post(), Attachment::UPLOAD_TYPE_FILES);
+            $upload->verifyFile();
+            $upload->save();
 
-            $result = UploadHelper::upload('file', 'files');
-            return ResultDataHelper::result(200, '上传成功', [
-                'urlPath' => $result['relativePath'] . $result['name'],
-            ]);
+            return ResultDataHelper::json(200, '上传成功', $upload->getBaseInfo());
         }
         catch (\Exception $e)
         {
-            return ResultDataHelper::result(404, $e->getMessage());
+            return ResultDataHelper::json(404, $e->getMessage());
         }
     }
 
     /**
-     * base64编码的图片上传
+     * 视频上传
      *
      * @return array
      * @throws \yii\web\NotFoundHttpException
      */
-    public function actionBase64Img()
+    public function actionVideos()
     {
         try
         {
-            return ResultDataHelper::result(200, '上传成功', UploadHelper::Base64Img(Yii::$app->request->post('image'), Yii::$app->request->post('extend', 'jpg')));
+            $upload = new UploadHelper(Yii::$app->request->post(), Attachment::UPLOAD_TYPE_VIDEOS);
+            $upload->verifyFile();
+            $upload->save();
+
+            return ResultDataHelper::json(200, '上传成功', $upload->getBaseInfo());
         }
         catch (\Exception $e)
         {
-            return ResultDataHelper::result(404, $e->getMessage());
+            return ResultDataHelper::json(404, $e->getMessage());
         }
     }
 
     /**
-     * 七牛云存储
+     * 语音上传
      *
      * @return array
-     * @throws \Exception
+     * @throws \yii\web\NotFoundHttpException
      */
-    public function actionQiniu()
+    public function actionVoices()
     {
         try
         {
-            return ResultDataHelper::result(200, '上传成功', UploadHelper::qiniu($_FILES['file']));
+            $upload = new UploadHelper(Yii::$app->request->post(), Attachment::UPLOAD_TYPE_VOICES);
+            $upload->verifyFile();
+            $upload->save();
+
+            return ResultDataHelper::json(200, '上传成功', $upload->getBaseInfo());
         }
         catch (\Exception $e)
         {
-            return ResultDataHelper::result(404, $e->getMessage());
+            return ResultDataHelper::json(404, $e->getMessage());
         }
     }
 
     /**
-     * 阿里云OSS上传
+     * base64编码的上传
      *
      * @return array
-     * @throws \Exception
      */
-    public function actionOss()
+    public function actionBase64()
     {
         try
         {
-            return ResultDataHelper::result(200, '上传成功', UploadHelper::oss($_FILES['file']));
+            // 保存扩展名称
+            $extend = Yii::$app->request->post('extend', 'jpg');
+            !in_array($extend, Yii::$app->params['uploadConfig']['images']['extensions']) && $extend = 'jpg';
+            $data = Yii::$app->request->post('image', '');
+
+            $upload = new UploadHelper(Yii::$app->request->post(), Attachment::UPLOAD_TYPE_IMAGES);
+            $upload->verifyBase64($data, $extend);
+            $upload->save(base64_decode($data));
+
+            return ResultDataHelper::json(200, '上传成功', $upload->getBaseInfo());
         }
         catch (\Exception $e)
         {
-            return ResultDataHelper::result(404, $e->getMessage());
+            return ResultDataHelper::json(404, $e->getMessage());
         }
+    }
+
+    /**
+     * 合并
+     *
+     * @return array
+     */
+    public function actionMerge()
+    {
+        $guid = Yii::$app->request->post('guid');
+        $mergeInfo = Yii::$app->cache->get(UploadHelper::PREFIX_MERGE_CACHE . $guid);
+
+        if (!$mergeInfo)
+        {
+            return ResultDataHelper::json(404, '找不到文件信息, 合并文件失败');
+        }
+
+        try
+        {
+            $upload = new UploadHelper($mergeInfo['config'], $mergeInfo['type']);
+            $upload->setPaths($mergeInfo['paths']);
+            $upload->setBaseInfo($mergeInfo['baseInfo']);
+            $upload->merge();
+
+            Yii::$app->cache->delete('upload-file-guid:' . $guid);
+
+            return ResultDataHelper::json(200, '合并完成', $upload->getBaseInfo());
+        }
+        catch (\Exception $e)
+        {
+            return ResultDataHelper::json(404, $e->getMessage());
+        }
+    }
+
+    /**
+     * 资源选择器
+     *
+     * @param bool $json
+     * @return array|string
+     */
+    public function actionSelector($json = false)
+    {
+        $upload_type = Yii::$app->request->get('upload_type', Attachment::UPLOAD_TYPE_IMAGES);
+        $year = Yii::$app->request->get('year', '');
+        $month = Yii::$app->request->get('month', '');
+
+        $data = Attachment::find()
+            ->where(['>=', 'status', StatusEnum::DISABLED])
+            ->andWhere(['upload_type' => $upload_type])
+            ->andFilterWhere(['year' => $year])
+            ->andFilterWhere(['month' => $month]);
+        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => 10, 'validatePage' => false]);
+        $models = $data->offset($pages->offset)
+            ->orderBy('id desc')
+            ->limit($pages->limit)
+            ->asArray()
+            ->all();
+
+        // 如果是以文件形式上传的图片手动修改为图片类型显示
+        foreach ($models as &$model)
+        {
+            if (preg_match("/^image/", $model['specific_type']) && $model['extension'] != 'psd')
+            {
+                $model['upload_type'] = Attachment::UPLOAD_TYPE_IMAGES;
+            }
+        }
+
+        // 判断是否直接返回json格式
+        if ($json == true)
+        {
+            return ResultDataHelper::json(200, '获取成功', $models);
+        }
+
+        $year = [];
+        for ($i = 2019; $i <= date('Y'); $i++)
+        {
+            $year[$i] = $i;
+        }
+
+        $month = [];
+        for ($i = 1; $i <= 12; $i++)
+        {
+            $month[$i] = $i;
+        }
+
+        return $this->renderAjax('@common/widgets/webuploader/views/selector', [
+            'models' => $models,
+            'upload_type' => $upload_type,
+            'month' => $month,
+            'year' => $year,
+            'boxId' => Yii::$app->request->get('boxId'),
+            'multiple' => Yii::$app->request->get('multiple'),
+        ]);
+    }
+
+    /**
+     * 获取本地文件列表
+     *
+     * @return array
+     */
+    protected function actionLocal()
+    {
+        /* 获取参数 */
+        $path = Yii::$app->request->get('path', 'images');
+        $year = Yii::$app->request->get('year', date('Y'));
+        $month = Yii::$app->request->get('month', date('m'));
+        $path = $path . '/' . $year . '/' . $month;
+        $size = Yii::$app->request->get('size', 20);
+        $this->fileStart = Yii::$app->request->get('start', 0);
+        $this->fileEnd = $this->fileStart + $size;
+        /* 设置驱动 */
+        $adapter = new Local(Yii::getAlias('@attachment'));
+        $this->filesystem = new Filesystem($adapter);
+
+        $prefix = Yii::$app->params['uploadConfig'][$path]['fullPath'] == true ? Yii::$app->request->hostInfo : '';
+        $files = $this->getLocalList($path, $prefix);
+
+        return ResultDataHelper::json(200, '获取成功', [
+            'list' => $files,
+            'start' => $this->fileStart,
+            'total' => count($files),
+        ]);
+    }
+
+    /**
+     * 根据目录获取文件列表
+     *
+     * @param string $path 文件路径
+     * @param string $allowFiles 文件后缀
+     * @param array $files 文件列表
+     * @param string $prefix 前缀
+     * @return array
+     */
+    protected function getLocalList($path, $prefix, &$files = [])
+    {
+        $listFiles = $this->filesystem->listContents($path);
+        foreach ($listFiles as $key => &$listFile)
+        {
+            if ($listFile['type'] == 'dir')
+            {
+                $this->getLocalList($listFile['path'], $prefix, $files);
+            }
+            else
+            {
+                // 获取选中列表
+                if ($this->fileNum >= $this->fileStart && $this->fileNum < $this->fileEnd)
+                {
+                    $listFile['path'] = $prefix . Yii::getAlias('@attachurl') . '/' . $listFile['path'];
+                    $files[] = $listFile;
+                }
+
+                $this->fileNum++;
+            }
+
+            unset($listFiles[$key]);
+        }
+
+        return $files;
     }
 }

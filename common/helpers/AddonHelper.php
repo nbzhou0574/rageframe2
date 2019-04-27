@@ -8,6 +8,7 @@ use common\models\sys\Addons;
 /**
  * Class AddonHelper
  * @package common\helpers
+ * @author jianyan74 <751393839@qq.com>
  */
 class AddonHelper
 {
@@ -17,6 +18,11 @@ class AddonHelper
     private static $resourcesUrl;
 
     /**
+     * @var array
+     */
+    protected static $addonModels = [];
+
+    /**
      * 获取插件配置
      *
      * @param $name
@@ -24,8 +30,7 @@ class AddonHelper
      */
     public static function getAddonConfig($name)
     {
-        $class = "addons\\{$name}\\AddonConfig";
-        return $class;
+        return "addons" . "\\" . $name . "\\" . "AddonConfig";
     }
 
     /**
@@ -36,8 +41,7 @@ class AddonHelper
      */
     public static function getAddonMessage($name)
     {
-        $class = "addons\\{$name}\\AddonMessage";
-        return $class;
+        return "addons" . "\\" . $name . "\\" . "AddonMessage";
     }
 
     /**
@@ -57,7 +61,7 @@ class AddonHelper
      */
     public static function getAddonIcon($name)
     {
-        return '/backend/resources/img/icon.jpg';
+        return Yii::getAlias('@web') . '/resources/dist/img/icon.jpg';
     }
 
     /**
@@ -86,6 +90,57 @@ class AddonHelper
     }
 
     /**
+     * 获取配置信息
+     *
+     * @return mixed
+     */
+    public static function getConfig()
+    {
+        $model = Yii::$app->params['addon'];
+        return unserialize($model->config);
+    }
+
+    /**
+     * 写入配置信息
+     *
+     * @param $config
+     * @return bool
+     */
+    public static function setConfig($config)
+    {
+        /* @var $model \common\models\sys\Addons */
+        $model = Yii::$app->params['addon'];
+        $model->config = serialize($config);
+        return $model->save();
+    }
+
+    /**
+     * 获取模块的App路径名称
+     *
+     * @return mixed|string
+     */
+    public static function getAppName()
+    {
+        $appId = [
+            "app-backend" => 'backend',
+            "app-frontend" => 'frontend',
+            "app-wechat" => 'wechat',
+            "app-api" => 'api',
+        ];
+
+        $moduleId = Yii::$app->controller->module->id;
+
+        // 判断如果是模块进入之前返回模块所在的应用id
+        if ($moduleId == 'addons')
+        {
+            return !empty(Yii::$app->params['addonInfo']['moduleId']) ? Yii::$app->params['addonInfo']['moduleId'] : 'backend';
+        }
+
+        Yii::$app->params['addonInfo']['moduleId'] = $appId[$moduleId];
+        return isset($appId[$moduleId]) ? $appId[$moduleId] : 'backend';
+    }
+
+    /**
      * 初始化模块信息
      *
      * @param string $addonName 模块名称
@@ -100,9 +155,35 @@ class AddonHelper
             throw new NotFoundHttpException("模块不能为空");
         }
 
-        if (!($addonModel = Addons::findByName($addonName)))
+        // 减少模块内多次调用hook的查询
+        if (isset(self::$addonModels[$addonName]))
         {
-            throw new NotFoundHttpException("模块不存在");
+            $addonModel = self::$addonModels[$addonName];
+        }
+        else
+        {
+            // 获取缓存
+            if (!($addonModel = Yii::$app->cache->get('sys-addons:' . $addonName)))
+            {
+                if (!($addonModel = Addons::findByName($addonName)))
+                {
+                    throw new NotFoundHttpException("模块不存在");
+                }
+
+                // 数据库依赖缓存
+                $dependency = new \yii\caching\DbDependency([
+                    'sql' => Addons::find()
+                        ->select('updated_at')
+                        ->orderBy('updated_at desc')
+                        ->where(['name' => $addonName])
+                        ->createCommand()
+                        ->getRawSql(),
+                ]);
+
+                Yii::$app->cache->set('sys-addons:' . $addonName, $addonModel, 360, $dependency);
+            }
+
+            self::$addonModels[$addonName] = $addonModel;
         }
 
         // 当前模块实例
@@ -148,31 +229,43 @@ class AddonHelper
         }
 
         $route = explode('/', $route);
-        if (count($route) < 2)
+        if (($countRoute = count($route)) < 2)
         {
             throw new NotFoundHttpException('路由解析错误,请检查路由地址');
         }
 
-        $controller = StringHelper::strUcwords($route[0]);
-        $action = StringHelper::strUcwords($route[1]);
+        $oldController = $route[$countRoute - 2];
+        $oldAction = $route[$countRoute - 1];
+
+        $controller = StringHelper::strUcwords($oldController);
+        $action = StringHelper::strUcwords($oldAction);
+        // 删除控制器和方法
+        unset($route[$countRoute - 1], $route[$countRoute - 2]);
+        $controllerPath = !empty($route) ? implode('\\', $route) : '';
+        !empty($controllerPath) && $controllerPath .= '\\';
 
         $controllerName = $controller . 'Controller';
-        $addonRootPath = "\\addons\\" . Yii::$app->params['addonInfo']['name'];
+        $addonRootPath = "\\" . "addons" . "\\" . Yii::$app->params['addonInfo']['name'];
         $tmpInfo = [
-            'oldController' => $route[0],
-            'oldAction' => $route[1],
+            'oldController' => $oldController,
+            'oldAction' => $oldAction,
             'controller' => $controller,
             'action' => $action,
             'controllerName' => $controllerName,
             'actionName' => "action" . $action,
             'rootPath' => $addonRootPath,
-            'rootAbsolutePath' => Yii::getAlias('@addons') .'/' .Yii::$app->params['addonInfo']['name'],
-            'controllersPath' => $addonRootPath . "\\" . $module . "\\controllers\\" . $controllerName
+            'rootAbsolutePath' => Yii::getAlias('@addons') . '/' .Yii::$app->params['addonInfo']['name'],
+            'controllersPath' => $addonRootPath . "\\" . $module . '\\'. "controllers". '\\' . $controllerPath . $controllerName
         ];
+
+        if (!class_exists($tmpInfo['controllersPath']))
+        {
+            throw new NotFoundHttpException('页面未找到。');
+        }
 
         // 存入模块基础的信息
         Yii::$app->params['addonInfo'] = ArrayHelper::merge(Yii::$app->params['addonInfo'], $tmpInfo);
-        unset($tmpInfo, $addonRootPath, $controllerName, $controller, $action);
+        unset($tmpInfo, $addonRootPath, $controllerName, $controller, $action, $controllerPath);
 
         return true;
     }

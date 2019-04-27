@@ -129,6 +129,7 @@ class RuleKeyword extends \yii\db\ActiveRecord
                 Rule::RULE_MODULE_ADDON => 'common\models\wechat\ReplyAddon',
             ];
 
+            /* @var $model \yii\db\ActiveRecord */
             $model = $modelList[$keyword->module]::find()
                 ->where(['rule_id' => $keyword->rule_id])
                 ->one();
@@ -138,11 +139,9 @@ class RuleKeyword extends \yii\db\ActiveRecord
                 // 文字回复
                 case  Rule::RULE_MODULE_TEXT :
                     return new Text($model->content);
-
                     break;
                 // 图文回复
                 case  Rule::RULE_MODULE_NEWS :
-
                     $news = $model->news;
                     $newsList = [];
                     if (!$news) return false;
@@ -157,12 +156,10 @@ class RuleKeyword extends \yii\db\ActiveRecord
                     }
 
                     return new News($newsList);
-
                     break;
                 // 图片回复
                 case  Rule::RULE_MODULE_IMAGES :
                     return new Image($model->media_id);
-
                     break;
                 // 视频回复
                 case Rule::RULE_MODULE_VIDEO :
@@ -170,29 +167,24 @@ class RuleKeyword extends \yii\db\ActiveRecord
                         'title' => $model->title,
                         'description' => $model->description,
                     ]);
-
                     break;
                 // 语音回复
                 case Rule::RULE_MODULE_VOICE :
                     return new Voice($model->media_id);
-
                     break;
                 // 自定义接口回复
                 case Rule::RULE_MODULE_USER_API :
-
                     if ($apiContent = ReplyUserApi::getApiData($model, Yii::$app->params['wechatMessage']))
                     {
                         return $apiContent;
                     }
 
                     return $model->default;
-
                     break;
                 // 默认为模块回复
                 default :
-                    $class = AddonHelper::getAddonMessage($keyword->module);
+                    $class = AddonHelper::getAddonMessage($model->addon);
                     return ExecuteHelper::map($class, 'run', Yii::$app->params['wechatMessage']);
-
                     break;
             }
         }
@@ -277,6 +269,19 @@ class RuleKeyword extends \yii\db\ActiveRecord
         // 插入数据
         $field = ['rule_id', 'module', 'content', 'sort', 'status', 'type'];
         !empty($rows) && Yii::$app->db->createCommand()->batchInsert(RuleKeyword::tableName(), $field, $rows)->execute();
+    }
+
+    /**
+     * @param string $fields
+     * @return array|\yii\db\ActiveRecord[]
+     */
+    public static function getList($fields = 'id, content')
+    {
+        return self::find()
+            ->where(['status' => StatusEnum::ENABLED])
+            ->select($fields)
+            ->asArray()
+            ->all();
     }
 
     /**

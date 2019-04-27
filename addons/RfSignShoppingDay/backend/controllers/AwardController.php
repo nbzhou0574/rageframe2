@@ -10,6 +10,7 @@ use yii\data\Pagination;
 /**
  * Class AwardController
  * @package addons\RfSignShoppingDay\backend\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class AwardController extends AddonsBaseController
 {
@@ -28,7 +29,7 @@ class AwardController extends AddonsBaseController
     public function actionIndex()
     {
         $data = Award::find();
-        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->_pageSize]);
+        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->pageSize]);
         $models = $data->offset($pages->offset)
             ->orderBy('id desc')
             ->limit($pages->limit)

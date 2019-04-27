@@ -1,10 +1,12 @@
 <?php
 namespace backend\components;
 
+use yii\web\NotFoundHttpException;
 
 /**
  * Class SystemInfo
  * @package backend\components
+ * @author jianyan74 <751393839@qq.com>
  */
 class SystemInfo
 {
@@ -32,9 +34,11 @@ class SystemInfo
 
     /**
      * SystemInfo constructor.
+     * @throws NotFoundHttpException
      */
     public function __construct()
     {
+        // Darwin
         switch (PHP_OS)
         {
             case'Linux':
@@ -42,6 +46,9 @@ class SystemInfo
                 break;
             case'WINNT':
                 $this->system = new SystemInfoWindows();
+                break;
+            default :
+                throw new NotFoundHttpException('当前系统为' . PHP_OS . ',不在支持范围，仅支持Linux和Windows');
                 break;
         }
     }

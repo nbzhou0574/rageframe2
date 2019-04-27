@@ -2,7 +2,10 @@
 
 namespace addons\RfArticle\common\models;
 
+use common\helpers\StringHelper;
 use Yii;
+use yii\behaviors\TimestampBehavior;
+use yii\db\ActiveRecord;
 
 /**
  * This is the model class for table "{{%addon_article}}".
@@ -26,6 +29,8 @@ use Yii;
  */
 class Article extends \common\models\common\BaseModel
 {
+    public $tags = [];
+
     /**
      * 推荐位(位运算)
      *
@@ -52,9 +57,9 @@ class Article extends \common\models\common\BaseModel
     {
         return [
             [['title'], 'required'],
-            [['cate_id', 'view', 'sort', 'status', 'created_at', 'updated_at'], 'integer'],
+            [['cate_id', 'view', 'sort', 'status', 'updated_at'], 'integer'],
             [['content'], 'string'],
-            [['position'], 'safe'],
+            [['position', 'created_at', 'tags'], 'safe'],
             [['title', 'seo_key'], 'string', 'max' => 50],
             [['cover', 'link'], 'string', 'max' => 100],
             [['seo_content'], 'string', 'max' => 1000],
@@ -74,6 +79,7 @@ class Article extends \common\models\common\BaseModel
             'cover' => '封面',
             'seo_key' => 'Seo Key',
             'seo_content' => 'Seo Content',
+            'tags' => '标签',
             'cate_id' => '分类',
             'description' => '简介',
             'position' => '推荐位',
@@ -83,8 +89,8 @@ class Article extends \common\models\common\BaseModel
             'view' => '浏览量',
             'sort' => '排序',
             'status' => '状态',
-            'created_at' => 'Created At',
-            'updated_at' => 'Updated At',
+            'created_at' => '创建时间',
+            'updated_at' => '更新时间',
         ];
     }
 
@@ -178,7 +184,7 @@ class Article extends \common\models\common\BaseModel
      */
     public function getCate()
     {
-        return $this->hasOne(ArticleCate::className(),['id' => 'cate_id']);
+        return $this->hasOne(ArticleCate::class,['id' => 'cate_id']);
     }
 
     /**
@@ -188,7 +194,7 @@ class Article extends \common\models\common\BaseModel
      */
     public function getTags()
     {
-        return $this->hasMany(ArticleTag::className(), ['id' => 'tag_id'])
+        return $this->hasMany(ArticleTag::class, ['id' => 'tag_id'])
             ->viaTable(ArticleTagMap::tableName(), ['article_id' => 'id'])
             ->asArray();
     }
@@ -201,7 +207,24 @@ class Article extends \common\models\common\BaseModel
     {
         // 推荐位
         $this->position = $this->getPosition();
+        $this->created_at = StringHelper::dateToInt($this->created_at);
 
         return parent::beforeSave($insert);
+    }
+
+    /**
+     * @return array
+     */
+    public function behaviors()
+    {
+        return [
+            [
+                'class' => TimestampBehavior::class,
+                'attributes' => [
+                    ActiveRecord::EVENT_BEFORE_INSERT => ['updated_at'],
+                    ActiveRecord::EVENT_BEFORE_UPDATE => ['updated_at'],
+                ],
+            ],
+        ];
     }
 }

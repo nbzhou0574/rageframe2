@@ -3,13 +3,16 @@ namespace addons\RfExample\backend\controllers;
 
 use yii;
 use yii\data\Pagination;
+use yii\helpers\ArrayHelper;
 use common\controllers\AddonsBaseController;
 use common\helpers\ResultDataHelper;
+use common\helpers\ExcelHelper;
 use addons\RfExample\common\models\Curd;
 
 /**
  * Class CurdController
  * @package addons\RfExample\backend\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class CurdController extends AddonsBaseController
 {
@@ -20,10 +23,16 @@ class CurdController extends AddonsBaseController
      */
     public function actionIndex()
     {
-        $data = Curd::find();
+        $title = Yii::$app->request->get('title');
+        $start_time = Yii::$app->request->get('start_time', date('Y-m-d', strtotime("-60 day")));
+        $end_time = Yii::$app->request->get('end_time', date('Y-m-d', strtotime("+1 day")));
+        
+        $data = Curd::find()
+            ->andFilterWhere(['like', 'title', $title])
+            ->andFilterWhere(['between','created_at', strtotime($start_time), strtotime($end_time)]);
         $pages = new Pagination([
             'totalCount' => $data->count(),
-            'pageSize' => $this->_pageSize
+            'pageSize' => $this->pageSize
         ]);
 
         $models = $data->offset($pages->offset)
@@ -33,6 +42,9 @@ class CurdController extends AddonsBaseController
         return $this->render('index',[
             'models' => $models,
             'pages' => $pages,
+            'title' => $title,
+            'start_time' => $start_time,
+            'end_time' => $end_time,
         ]);
     }
 
@@ -46,12 +58,12 @@ class CurdController extends AddonsBaseController
         $request  = Yii::$app->request;
         $id = $request->get('id', null);
         $model = $this->findModel($id);
-        $model->covers = unserialize($model->covers);
-        $model->files = json_decode($model->files, true);
+        !empty($model->covers) && $model->covers = unserialize($model->covers);
+        !empty($model->covers) && $model->files = json_decode($model->files, true);
         if ($model->load($request->post()))
         {
-            $model->covers = serialize($model->covers);
-            $model->files = json_encode($model->files);
+            !empty($model->covers) && $model->covers = serialize($model->covers);
+            !empty($model->files) && $model->files = json_encode($model->files);
 
             if ($model->save())
             {
@@ -85,31 +97,52 @@ class CurdController extends AddonsBaseController
     /**
      * 更新排序/状态字段
      *
+     * @param $id
      * @return array
      */
-    public function actionAjaxUpdate()
+    public function actionAjaxUpdate($id)
     {
-        $data = Yii::$app->request->get();
-        $insertData = [];
-        foreach (['id', 'sort', 'status'] as $item)
+        if (!($model = Curd::findOne($id)))
         {
-            isset($data[$item]) && $insertData[$item] = $data[$item];
+            return ResultDataHelper::json(404, '找不到数据');
         }
 
-        unset($data);
-
-        if (!($model = Curd::findOne($insertData['id'])))
-        {
-            return ResultDataHelper::result(404, '找不到数据');
-        }
-
-        $model->attributes = $insertData;
+        $model->attributes = ArrayHelper::filter(Yii::$app->request->get(), ['sort', 'status']);
         if (!$model->save())
         {
-            return ResultDataHelper::result(422, $this->analyErr($model->getFirstErrors()));
+            return ResultDataHelper::json(422, $this->analyErr($model->getFirstErrors()));
         }
 
-        return ResultDataHelper::result(200, '修改成功');
+        return ResultDataHelper::json(200, '修改成功');
+    }
+
+    /**
+     * 导出Excel
+     *
+     * @return bool
+     * @throws \PhpOffice\PhpSpreadsheet\Exception
+     * @throws \PhpOffice\PhpSpreadsheet\Writer\Exception
+     */
+    public function actionExport()
+    {
+        // [名称, 字段名, 类型, 类型规则]
+        $header = [
+            ['ID', 'id'],
+            ['标题', 'title', 'text'],
+            ['用户账号', 'manager.username', 'text'],
+            ['状态', 'status', 'selectd', [0 => '已禁用', 1 => '已启用', -1 => '已删除']],
+            ['性别', 'sex', 'function', function($model){
+                return $model['sex'] == 1 ? '男' : '女';
+            }],
+            ['创建时间', 'created_at', 'date', 'Y-m-d'],
+        ];
+
+        $list = Curd::find()
+            ->with(['manager'])
+            ->asArray()
+            ->all();
+
+        return ExcelHelper::exportData($list, $header, 'Curd数据导出_' . time());
     }
 
     /**

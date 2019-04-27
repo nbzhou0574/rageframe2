@@ -8,6 +8,7 @@ use addons\RfSignShoppingDay\common\models\User;
 /**
  * Class IController
  * @package addons\RfSignShoppingDay\wechat\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class IController extends AddonsBaseController
 {
@@ -16,7 +17,7 @@ class IController extends AddonsBaseController
      *
      * @var bool
      */
-    protected $_openGetWechatUser = true;
+    protected $openGetWechatUser = true;
 
     /**
      * @var string
@@ -41,7 +42,7 @@ class IController extends AddonsBaseController
         Yii::$app->params['simulateUser']['switch'] = true;
 
         /** 检测到微信进入自动获取用户信息 **/
-        if ($this->_openGetWechatUser && Yii::$app->wechat->isWechat && !Yii::$app->wechat->isAuthorized())
+        if ($this->openGetWechatUser && Yii::$app->wechat->isWechat && !Yii::$app->wechat->isAuthorized())
         {
             return Yii::$app->wechat->authorizeRequired()->send();
         }

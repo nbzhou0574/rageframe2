@@ -1,5 +1,4 @@
 <?php
-
 namespace common\models\wechat;
 
 use Yii;
@@ -75,7 +74,8 @@ class Attachment extends \common\models\common\BaseModel
     {
         return [
             [['width', 'height', 'link_type', 'status', 'created_at', 'updated_at'], 'integer'],
-            [['file_name', 'local_url', 'media_id'], 'string', 'max' => 255],
+            [['file_name', 'local_url', 'media_id'], 'string', 'max' => 150],
+            [['media_id'], 'string', 'max' => 50],
             [['media_type'], 'string', 'max' => 15],
             [['media_url'], 'string', 'max' => 5000],
             [['is_temporary'], 'string', 'max' => 10],
@@ -99,8 +99,8 @@ class Attachment extends \common\models\common\BaseModel
             'is_temporary' => '是否临时',
             'link_type' => '是否微信图文',
             'status' => '状态',
-            'created_at' => 'Created At',
-            'updated_at' => 'Updated At',
+            'created_at' => '创建时间',
+            'updated_at' => '更新时间',
         ];
     }
 
@@ -127,7 +127,7 @@ class Attachment extends \common\models\common\BaseModel
      * @param $id
      * @return Attachment|null
      */
-    public static function getFindId($id)
+    public static function findById($id)
     {
         return self::findOne($id);
     }
@@ -154,17 +154,61 @@ class Attachment extends \common\models\common\BaseModel
      */
     public function getNews()
     {
-        return $this->hasMany(AttachmentNews::className(), ['attachment_id' => 'id']);
+        return $this->hasMany(AttachmentNews::class, ['attachment_id' => 'id']);
     }
 
     /**
-     * @return bool
+     * @throws \Throwable
+     * @throws \yii\db\StaleObjectException
      */
-    public function beforeDelete()
+    public function afterDelete()
     {
-        // 删除文章详细详细
-        $this->media_type == self::TYPE_NEWS && AttachmentNews::deleteAll(['attachment_id' => $this->id]);
+        switch ($this->media_type)
+        {
+            case self::TYPE_NEWS :
+                AttachmentNews::deleteAll(['attachment_id' => $this->id]);
 
-        return parent::beforeDelete();
+                if ($model = ReplyNews::find()->where(['attachment_id' => $this->id])->one())
+                {
+                    $rule_id = $model->rule_id;
+                }
+
+                break;
+
+            case self::TYPE_IMAGE :
+
+                if ($model = ReplyImages::find()->where(['media_id' => $this->media_id])->one())
+                {
+                    $rule_id = $model->rule_id;
+                }
+
+                break;
+
+            case self::TYPE_VIDEO :
+
+                if ($model = ReplyVideo::find()->where(['media_id' => $this->media_id])->one())
+                {
+                    $rule_id = $model->rule_id;
+                }
+
+                break;
+
+            case self::TYPE_VOICE :
+
+                if ($model = ReplyVoice::find()->where(['media_id' => $this->media_id])->one())
+                {
+                    $rule_id = $model->rule_id;
+                }
+
+                break;
+        }
+
+        // 删除规则
+        if (!empty($rule_id) && ($ruleModel = Rule::findOne($rule_id)))
+        {
+            $ruleModel->delete();
+        }
+
+        parent::afterDelete();
     }
 }

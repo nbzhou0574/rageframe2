@@ -7,6 +7,8 @@ use yii\web\Response;
 use yii\widgets\ActiveForm;
 use yii\base\InvalidConfigException;
 use common\helpers\ResultDataHelper;
+use common\enums\StatusEnum;
+use common\helpers\ArrayHelper;
 
 /**
  * CURD基类特性
@@ -14,20 +16,11 @@ use common\helpers\ResultDataHelper;
  * 注意：会覆盖父类的继承方法，注意使用
  * Trait CurdTrait
  * @package backend\components
+ * @property yii\db\ActiveRecord|yii\base\Model $modelClass;
+ * @author jianyan74 <751393839@qq.com>
  */
 trait CurdTrait
 {
-    /**
-     * 授权可ajax更新的字段
-     *
-     * @var array
-     */
-    protected $_ajaxUpdateField = [
-        'id',
-        'sort',
-        'status'
-    ];
-
     /**
      * @throws InvalidConfigException
      */
@@ -48,8 +41,9 @@ trait CurdTrait
      */
     public function actionIndex()
     {
-        $data = $this->modelClass::find();
-        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->_pageSize]);
+        $data = $this->modelClass::find()
+            ->where(['>=', 'status', StatusEnum::DISABLED]);
+        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->pageSize]);
         $models = $data->offset($pages->offset)
             ->orderBy('id desc')
             ->limit($pages->limit)
@@ -62,7 +56,7 @@ trait CurdTrait
     }
 
     /**
-     * 编辑/新增
+     * 编辑/创建
      *
      * @return mixed
      */
@@ -83,12 +77,34 @@ trait CurdTrait
     }
 
     /**
+     * 伪删除
+     *
+     * @param $id
+     * @return mixed
+     */
+    public function actionDestroy($id)
+    {
+        if (!($model = $this->modelClass::findOne($id)))
+        {
+            return $this->message("找不到数据", $this->redirect(['index']), 'error');
+        }
+
+        $model->status = StatusEnum::DELETE;
+        if ($model->save())
+        {
+            return $this->message("删除成功", $this->redirect(['index']));
+        }
+
+        return $this->message("删除失败", $this->redirect(['index']), 'error');
+    }
+
+    /**
      * 删除
      *
      * @param $id
      * @return mixed
      * @throws \Throwable
-     * @throws yii\db\StaleObjectException
+     * @throws \yii\db\StaleObjectException
      */
     public function actionDelete($id)
     {
@@ -101,43 +117,36 @@ trait CurdTrait
     }
 
     /**
-     * 更新排序/状态字段
+     * ajax更新排序/状态
      *
+     * @param $id
      * @return array
      */
-    public function actionAjaxUpdate()
+    public function actionAjaxUpdate($id)
     {
-        $data = Yii::$app->request->get();
-        $insertData = [];
-        foreach ($this->_ajaxUpdateField as $item)
+        if (!($model = $this->modelClass::findOne($id)))
         {
-            isset($data[$item]) && $insertData[$item] = $data[$item];
+            return ResultDataHelper::json(404, '找不到数据');
         }
 
-        unset($data);
-
-        if (!($model = $this->modelClass::findOne($insertData['id'])))
-        {
-            return ResultDataHelper::result(404, '找不到数据');
-        }
-
-        $model->attributes = $insertData;
+        $data = ArrayHelper::filter(Yii::$app->request->get(), ['sort', 'status']);
+        $model->attributes = $data;
         if (!$model->save())
         {
-            return ResultDataHelper::result(422, $this->analyErr($model->getFirstErrors()));
+            return ResultDataHelper::json(422, $this->analyErr($model->getFirstErrors()));
         }
 
-        return ResultDataHelper::result(200, '修改成功');
+        return ResultDataHelper::json(200, '修改成功');
     }
 
     /**
-     * 编辑/新增
+     * ajax编辑/创建
      *
-     * @return array|mixed|string|Response
+     * @return array
      */
     public function actionAjaxEdit()
     {
-        $request  = Yii::$app->request;
+        $request = Yii::$app->request;
         $id = $request->get('id');
         $model = $this->findModel($id);
         if ($model->load($request->post()))
@@ -162,10 +171,11 @@ trait CurdTrait
      * 返回模型
      *
      * @param $id
-     * @return mixed
+     * @return \yii\db\ActiveRecord
      */
     protected function findModel($id)
     {
+        /* @var $model \yii\db\ActiveRecord */
         if (empty($id) || empty(($model = $this->modelClass::findOne($id))))
         {
             $model = new $this->modelClass;

@@ -24,7 +24,7 @@ return [
             'idParam' => '__wechat',
         ],
         'session' => [
-            // this is the name of the session cookie used for login on the wechat
+            // 用于登录微信的会话cookie的名称
             'name' => 'advanced-wechat',
         ],
         'log' => [
@@ -33,6 +33,7 @@ return [
                 [
                     'class' => 'yii\log\FileTarget',
                     'levels' => ['error', 'warning'],
+                    'logFile' => '@runtime/logs/' . date('Y-m/d') . '.log',
                 ],
             ],
         ],
@@ -42,26 +43,28 @@ return [
         /** ------ 路由配置 ------ **/
         'urlManager' => [
             'class' => 'yii\web\UrlManager',
-            'enablePrettyUrl' => true,  //这个是生成路由 ?r=site/about--->/site/about
+            'enablePrettyUrl' => true,  // 这个是生成路由 ?r=site/about--->/site/about
             'showScriptName' => false,
-            'suffix' => '.html',//静态
+            'suffix' => '.html',// 静态
             'rules' =>[
 
             ],
+        ],
+        /** ------ 资源替换 ------ **/
+        'assetManager' => [
+            'appendTimestamp' => true,
+        ],
+        'response' => [
+            'class' => 'yii\web\Response',
+            'on beforeSend' => function($event) {
+                Yii::$app->services->errorLog->record($event->sender);
+            },
         ],
     ],
     'controllerMap' => [
         // 微信数据处理
         'api' => [
             'class' => 'common\controllers\WechatApiController',
-        ],
-        // 文件上传公共控制器
-        'file' => [
-            'class' => 'common\controllers\FileBaseController',
-        ],
-        // 百度编辑器
-        'ueditor' => [
-            'class' => 'common\widgets\ueditor\UeditorController',
         ],
         // 插件渲染默认控制器
         'addons' => [

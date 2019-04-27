@@ -1,10 +1,12 @@
 <?php
 use yii\helpers\Url;
+use yii\helpers\Json;
 
 ?>
 
 <div class="modal-header">
-    <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">×</span><span class="sr-only">关闭</span></button>
+    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+        <span aria-hidden="true">×</span></button>
     <h4 class="modal-title">基本信息</h4>
 </div>
 <div class="modal-body">
@@ -12,11 +14,11 @@ use yii\helpers\Url;
         <tbody>
         <tr>
             <td>行为</td>
-            <td><?= $model['behavior']?></td>
+            <td><?= $model['behavior'] ?></td>
         </tr>
         <tr>
             <td>提交方法</td>
-            <td><?= $model['method']?></td>
+            <td><?= $model['method'] ?></td>
         </tr>
         <tr>
             <td>用户</td>
@@ -47,7 +49,7 @@ use yii\helpers\Url;
             <td style="max-width: 700px">
                 <?php
                 echo "<pre>";
-                print_r(json_decode($model['get_data'], true))
+                print_r(Json::decode($model['get_data']))
                 ?>
             </>
         </tr>
@@ -56,7 +58,7 @@ use yii\helpers\Url;
             <td style="max-width: 700px">
                 <?php
                 echo "<pre>";
-                print_r(json_decode($model['post_data'], true))
+                print_r(Json::decode($model['post_data']))
                 ?>
             </td>
         </tr>

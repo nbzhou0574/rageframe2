@@ -58,7 +58,7 @@ class SiteController extends Controller
     {
         return [
             'access' => [
-                'class' => AccessControl::className(),
+                'class' => AccessControl::class,
                 'rules' => [
                     [
                         'actions' => ['login', 'error','captcha'],
@@ -72,7 +72,7 @@ class SiteController extends Controller
                 ],
             ],
             'verbs' => [
-                'class' => VerbFilter::className(),
+                'class' => VerbFilter::class,
                 'actions' => [
                     'logout' => ['post'],
                 ],
@@ -84,13 +84,14 @@ class SiteController extends Controller
      * 登录
      *
      * @return string|\yii\web\Response
+     * @throws \yii\base\InvalidConfigException
      */
     public function actionLogin()
     {
         if (!Yii::$app->user->isGuest)
         {
-            // 记录日志
-            Yii::$app->debris->log('login', '自动登录');
+            // 记录行为日志
+            Yii::$app->services->sys->log('login', '自动登录', false);
             return $this->goHome();
         }
 
@@ -98,8 +99,8 @@ class SiteController extends Controller
         $model->loginCaptchaRequired();
         if ($model->load(Yii::$app->request->post()) && $model->login())
         {
-            // 记录日志
-            Yii::$app->debris->log('login', '账号密码登录', false);
+            // 记录行为日志
+            Yii::$app->services->sys->log('login', '账号密码登录', false);
             return $this->goHome();
         }
 
@@ -112,11 +113,12 @@ class SiteController extends Controller
      * 退出登陆
      *
      * @return \yii\web\Response
+     * @throws \yii\base\InvalidConfigException
      */
     public function actionLogout()
     {
-        // 记录日志
-        Yii::$app->debris->log('logout', '退出登录');
+        // 记录行为日志
+        Yii::$app->services->sys->log('logout', '退出登录');
         Yii::$app->user->logout();
 
         return $this->goHome();

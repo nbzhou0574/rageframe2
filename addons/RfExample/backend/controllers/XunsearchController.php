@@ -14,9 +14,29 @@ use addons\RfExample\common\models\Xunsearch;
  *
  * Class XunsearchController
  * @package addons\RfExample\backend\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class XunsearchController extends AddonsBaseController
 {
+    /**
+     * 到时候正式请配置在main里面
+     *
+     * 注意需要composer.json里面加入 "hightman/xunsearch": "*@beta",
+     *
+     * @throws \yii\base\InvalidConfigException
+     */
+    public function init()
+    {
+        /** ------ xunsearch搜索引擎 ------ **/
+        Yii::$app->set('xunsearch', [
+            'class' => 'hightman\xunsearch\Connection', // 此行必须
+            'iniDirectory' => '@common/config', // 搜索 ini 文件目录，默认：@vendor/hightman/xunsearch/app
+            'charset' => 'utf-8', // 指定项目使用的默认编码，默认即时 utf-8，可不指定
+        ]);
+
+        parent::init();
+    }
+
     /**
      * 首页
      *
@@ -57,7 +77,7 @@ class XunsearchController extends AddonsBaseController
         $data = Xunsearch::find()->where($condition);
         $pages = new Pagination([
             'totalCount' => $data->count(),
-            'pageSize' => $this->_pageSize
+            'pageSize' => $this->pageSize
         ]);
 
         $models = $data->offset($pages->offset)
@@ -115,6 +135,7 @@ class XunsearchController extends AddonsBaseController
      *
      * @param $id
      * @return Xunsearch|null
+     * @throws \Exception
      */
     protected function findModel($id)
     {

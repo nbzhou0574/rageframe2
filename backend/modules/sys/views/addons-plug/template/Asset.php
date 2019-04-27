@@ -2,22 +2,22 @@
 
 echo "<?php\n";
 ?>
-namespace addons\<?= $model->name;?>\assets;
+namespace addons\<?= $model->name;?>\<?= $appID ?>\assets;
 
 use yii\web\AssetBundle;
 
 /**
  * 静态资源管理
  *
- * Class <?= $appID ?>Asset
- * @package addons\<?= $model->name;?>\assets
+ * Class Asset
+ * @package addons\<?= $model->name;?>\<?= $appID ?>\assets
  */
-class <?= $appID ?>Asset extends AssetBundle
+class Asset extends AssetBundle
 {
     /**
      * @var string
      */
-    public $sourcePath = '@addons/<?= $model->name;?>/resources';
+    public $sourcePath = '@addons/<?= $model->name;?>/resources/<?= $appID ?>/';
 
     public $css = [
 

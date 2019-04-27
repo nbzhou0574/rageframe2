@@ -12,18 +12,16 @@ return [
     'controllerNamespace' => 'api\controllers',
     'bootstrap' => ['log'],
     'modules' => [
-        // 版本1
-        'v1' => [
+        'v1' => [ // 版本1
             'class' => 'api\modules\v1\Module',
         ],
-        // 版本2
-        'v2' => [
+        'v2' => [ // 版本2
             'class' => 'api\modules\v2\Module',
         ],
     ],
     'components' => [
         'user' => [
-            'identityClass' => 'common\models\common\AccessToken',
+            'identityClass' => 'common\models\api\AccessToken',
             'enableAutoLogin' => true,
             'enableSession' => false,// 显示一个HTTP 403 错误而不是跳转到登录界面
             'loginUrl' => null,
@@ -34,6 +32,7 @@ return [
                 [
                     'class' => 'yii\log\FileTarget',
                     'levels' => ['error', 'warning'],
+                    'logFile' => '@runtime/logs/' . date('Y-m/d') . '.log',
                 ],
             ],
         ],
@@ -58,8 +57,7 @@ return [
                          * 默认登录测试控制器(Post)
                          * http://当前域名/api/v1/site/login
                          */
-                        'addons',
-                        'web-hook',// git自动更新钩子
+                        // 'sign-secret-key',
                         // 版本1
                         'v1/default',// 默认测试入口
                         'v1/site',
@@ -67,42 +65,50 @@ return [
                         'v1/mini-program-pay',
                         'v1/member/info',
                         'v1/member/address',
-                        'v1/live/room',
+                        'v1/member/auth',
                         // 版本2
                         'v2/default',// 默认测试入口
                     ],
                     'pluralize' => false,// 是否启用复数形式，注意index的复数indices，开启后不直观
                     'extraPatterns' => [
-                        'POST gitee' => 'gitee', // 码云钩子
-                        'GET execute' => 'execute', // 插件渲染
                         'POST login' => 'login',// 登录获取token
                         'POST refresh' => 'refresh',// 重置token
-                        // 测试查询可删除 http://当前域名/api/v1/member/member/search
+                        // 测试查询可删除 例如：http://www.rageframe.com/api/v1/default/search
                         'GET search' => 'search',
                         'GET session-key' => 'session-key',// 小程序获取session key
                         'POST decode' => 'decode',// 解密获取小程序用户信息数据
-                        'POST find-token-by-openid' => 'find-token-by-openid',// 通过openid返回token
+                        'GET qr-code' => 'qr-code',// 获取小程序码
                     ],
                 ],
                 [
                     'class' => 'yii\rest\UrlRule',
                     'controller' => ['v1/file'],
                     'pluralize' => false,
-                    'patterns' => [
+                    'extraPatterns' => [
                         'POST images' => 'images', // 图片上传
                         'POST videos' => 'videos', // 视频上传
                         'POST voices' => 'voices', // 语音上传
                         'POST files' => 'files', // 文件上传
                         'POST base64-img' => 'base64-img', // base64上传 其他上传权限自己添加
-                        'POST qiniu' => 'qiniu', // 七牛上传
-                        'POST oss' => 'oss', // 阿里云oss上传
+                        'POST merge' => 'merge', // 合并分片
+                    ],
+                ],
+                [
+                    'class' => 'yii\rest\UrlRule',
+                    'controller' => ['addons',],
+                    'pluralize' => false,// 是否启用复数形式，注意index的复数indices，开启后不直观
+                    'extraPatterns' => [
+                        'GET execute' => 'execute', // 插件渲染
+                        'POST execute' => 'execute', // 插件渲染
+                        'PUT execute' => 'execute', // 插件渲染
+                        'DELETE execute' => 'execute', // 插件渲染
                     ],
                 ],
             ]
         ],
         'response' => [
             'class' => 'yii\web\Response',
-            'as beforeSend' => 'api\behaviors\beforeSend',
+            'as beforeSend' => 'api\behaviors\BeforeSend',
         ],
         'request' => [
             'csrfParam' => '_csrf-api',

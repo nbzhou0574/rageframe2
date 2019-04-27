@@ -6,11 +6,11 @@ use common\enums\StatusEnum;
 
 <div class="form-group" style="padding-left: -15px">
     <?= Html::label($row['title'], $row['name'], ['class' => 'control-label demo']);?>
-    <?php if($row['is_hide_remark'] != StatusEnum::ENABLED){ ?>
+    <?php if ($row['is_hide_remark'] != StatusEnum::ENABLED){ ?>
         (<?= $row['remark']?>)
     <?php } ?>
     <div class="col-sm-push-10">
-        <?= \backend\widgets\webuploader\Image::widget([
+        <?= \common\widgets\webuploader\Images::widget([
             'name' => "config[".$row['name']."]",
             'value' => unserialize($row['value']),
             'config' => [

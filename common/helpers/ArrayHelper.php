@@ -6,6 +6,7 @@ use yii\helpers\BaseArrayHelper;
 /**
  * Class ArrayHelper
  * @package common\helpers
+ * @author jianyan74 <751393839@qq.com>
  */
 class ArrayHelper extends BaseArrayHelper
 {
@@ -13,19 +14,19 @@ class ArrayHelper extends BaseArrayHelper
      * 递归数组
      *
      * @param array $items
-     * @param string $id
+     * @param string $idField
      * @param int $pid
-     * @param string $pidName
+     * @param string $pidField
      * @return array
      */
-    public static function itemsMerge(array $items, $id = "id", $pid = 0, $pidName = 'pid')
+    public static function itemsMerge(array $items, $pid = 0, $idField = "id", $pidField = 'pid', $child = '-')
     {
         $arr = [];
         foreach($items as $v)
         {
-            if($v[$pidName] == $pid)
+            if ($v[$pidField] == $pid)
             {
-                $v['-'] = self::itemsMerge($items, $id, $v[$id], $pidName);
+                $v[$child] = self::itemsMerge($items, $v[$idField], $idField, $pidField);
                 $arr[] = $v;
             }
         }
@@ -49,27 +50,6 @@ class ArrayHelper extends BaseArrayHelper
             {
                 $arr[] = $v;
                 $arr = array_merge(self::getParents($items, $v['pid']), $arr);
-            }
-        }
-        return $arr;
-    }
-
-    /**
-     * 传递一个父级分类ID返回所有子分类ID
-     *
-     * @param $cate
-     * @param int $pid
-     * @return array
-     */
-    public static function getChildsId($cate, $pid)
-    {
-        $arr = [];
-        foreach ($cate as $v)
-        {
-            if ($v['pid'] == $pid)
-            {
-                $arr[] = $v['id'];
-                $arr = array_merge($arr, self::getChildsId($cate, $v['id']));
             }
         }
 
@@ -99,6 +79,30 @@ class ArrayHelper extends BaseArrayHelper
     }
 
     /**
+     * 传递一个父级分类ID返回所有子分类ID
+     *
+     * @param $cate
+     * @param $pid
+     * @param string $idField
+     * @param string $pidField
+     * @return array
+     */
+    public static function getChildIds($cate, $pid, $idField = "id", $pidField = 'pid')
+    {
+        $arr = [];
+        foreach ($cate as $v)
+        {
+            if ($v[$pidField] == $pid)
+            {
+                $arr[] = $v[$idField];
+                $arr = array_merge($arr, self::getChildIds($cate, $v[$idField], $idField, $pidField));
+            }
+        }
+
+        return $arr;
+    }
+
+    /**
      * php二维数组排序 按照指定的key 对数组进行排序
      *
      * @param array $arr 将要排序的数组
@@ -109,30 +113,28 @@ class ArrayHelper extends BaseArrayHelper
     public static function arraySort($arr, $keys, $type = 'asc')
     {
         $count = count($arr);
-        if($count <= 1)
+        if ($count <= 1)
         {
             return $arr;
         }
-        else
+
+        $keysvalue = [];
+        $new_array = [];
+
+        foreach ($arr as $k => $v)
         {
-            $keysvalue = [];
-            $new_array = [];
-
-            foreach ($arr as $k => $v)
-            {
-                $keysvalue[$k] = $v[$keys];
-            }
-
-            $type == 'asc' ? asort($keysvalue) : arsort($keysvalue);
-            reset($keysvalue);
-
-            foreach ($keysvalue as $k => $v)
-            {
-                $new_array[$k] = $arr[$k];
-            }
-
-            return $new_array;
+            $keysvalue[$k] = $v[$keys];
         }
+
+        $type == 'asc' ? asort($keysvalue) : arsort($keysvalue);
+        reset($keysvalue);
+
+        foreach ($keysvalue as $k => $v)
+        {
+            $new_array[$k] = $arr[$k];
+        }
+
+        return $new_array;
     }
 
     /**
@@ -153,24 +155,24 @@ class ArrayHelper extends BaseArrayHelper
         return $new_array;
     }
 
-
     /**
      * 根据级别和数组返回字符串
      *
-     * @param $level
+     * @param int $level 级别
      * @param array $models
      * @param $k
+     * @param int $treeStat 开始计算
      * @return bool|string
      */
-    public static function itemsLevel($level, array $models, $k)
+    public static function itemsLevel($level, array $models, $k, $treeStat = 1)
     {
         $str = '';
         for ($i = 1; $i < $level; $i++)
         {
             $str .= '　　';
-            if($i == $level - 1)
+            if ($i == $level - $treeStat)
             {
-                if(isset($models[$k + 1]))
+                if (isset($models[$k + 1]))
                 {
                     return $str . "├──";
                 }
@@ -186,24 +188,60 @@ class ArrayHelper extends BaseArrayHelper
      * 必须经过递归才能进行重组为下拉框
      *
      * @param $models
+     * @param string $idField
+     * @param string $titleField
+     * @param int $treeStat
      * @return array
      */
-    public static function itemsMergeDropDown($models)
+    public static function itemsMergeDropDown($models, $idField = 'id', $titleField = 'title', $treeStat = 1)
     {
         $arr = [];
         foreach ($models as $k => $model)
         {
             $arr[] = [
-                'id' => $model['id'],
-                'title' => self::itemsLevel($model['level'], $models, $k) . " " . $model['title'],
+                $idField => $model[$idField],
+                $titleField => self::itemsLevel($model['level'], $models, $k, $treeStat) . " " . $model[$titleField],
             ];
 
             if (!empty($model['-']))
             {
-                $arr = ArrayHelper::merge($arr, self::itemsMergeDropDown($model['-']));
+                $arr = ArrayHelper::merge($arr, self::itemsMergeDropDown($model['-'], $idField, $titleField));
             }
         }
 
         return $arr;
+    }
+
+    /**
+     * 数组转xml
+     *
+     *
+     * @param $arr
+     * 微信回调成功：['return_code' => 'SUCCESS', 'return_msg' => 'OK']
+     * 微信回调失败：['return_code' => 'FAIL', 'return_msg' => 'OK']
+     * @return bool|string
+     */
+    public static function toXml($arr)
+    {
+        if (!is_array($arr) || count($arr) <= 0)
+        {
+            return false;
+        }
+
+        $xml = "<xml>";
+        foreach ($arr as $key => $val)
+        {
+            if (is_numeric($val))
+            {
+                $xml .= "<" . $key . ">" . $val . "</" . $key . ">";
+            }
+            else
+            {
+                $xml .= "<" . $key . "><![CDATA[" . $val . "]]></" . $key . ">";
+            }
+        }
+
+        $xml .= "</xml>";
+        return $xml;
     }
 }

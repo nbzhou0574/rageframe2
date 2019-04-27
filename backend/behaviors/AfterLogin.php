@@ -9,7 +9,8 @@ use yii\base\Behavior;
  * 登陆后的行为
  *
  * Class AfterLogin
- * @package common\behaviors
+ * @package backend\behaviors
+ * @author jianyan74 <751393839@qq.com>
  */
 class AfterLogin extends Behavior
 {
@@ -29,13 +30,14 @@ class AfterLogin extends Behavior
     }
 
     /**
-     * 登录事件
+     * 登录后触发事件
      *
      * @param $event
      * @return mixed
      */
     public function afterLogin($event)
     {
+        /* @var $model \yii\db\ActiveRecord */
         $model = $event->identity;
         $model->visit_count += 1;;
         $model->last_time = time();

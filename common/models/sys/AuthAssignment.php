@@ -31,10 +31,10 @@ class AuthAssignment extends \common\models\common\BaseModel
     {
         return [
             [['item_name', 'user_id'], 'required'],
-            [['created_at'], 'integer'],
-            [['item_name', 'user_id'], 'string', 'max' => 64],
+            [['created_at', 'user_id'], 'integer'],
+            [['item_name'], 'string', 'max' => 64],
             [['item_name', 'user_id'], 'unique', 'targetAttribute' => ['item_name', 'user_id']],
-            [['item_name'], 'exist', 'skipOnError' => true, 'targetClass' => AuthItem::className(), 'targetAttribute' => ['item_name' => 'name']],
+            [['item_name'], 'exist', 'skipOnError' => true, 'targetClass' => AuthItem::class, 'targetAttribute' => ['item_name' => 'name']],
         ];
     }
 
@@ -46,7 +46,7 @@ class AuthAssignment extends \common\models\common\BaseModel
         return [
             'item_name' => '角色名称',
             'user_id' => 'User ID',
-            'created_at' => 'Created At',
+            'created_at' => '创建时间',
         ];
     }
 
@@ -54,28 +54,26 @@ class AuthAssignment extends \common\models\common\BaseModel
      * @param $id
      * @return array|null|\yii\db\ActiveRecord
      */
-    public static function getUserItemName($id)
+    public static function finldByUserId($id)
     {
         return self::find()
             ->where(['user_id' => $id])
-            ->with('itemNameChild')
+            ->with(['authItemChild', 'addonsAuthItemChild'])
             ->asArray()
             ->one();
     }
 
     /**
-     * @param $user_id      -用户id
-     * @param $item_name    -权限名称
+     * @param $itemNames
+     * @return array|null|ActiveRecord
      */
-    public function setAuthRole($user_id,$item_name)
+    public static function finldItemNames($itemNames)
     {
-        $this::deleteAll(['user_id'=>$user_id]);
-
-        $authAssignment = new $this;
-        $authAssignment->user_id    = $user_id;
-        $authAssignment->item_name  = $item_name;
-
-        return $authAssignment->save() ? true : false ;
+        return self::find()
+            ->where(['in', 'item_name', $itemNames])
+            ->select('user_id')
+            ->asArray()
+            ->one();
     }
 
     /**
@@ -91,18 +89,40 @@ class AuthAssignment extends \common\models\common\BaseModel
         }
 
         $model = $this::find()
-            ->where(['user_id'=>$user_id])
+            ->where(['user_id' => $user_id])
             ->one();
 
         return $model ? $model->item_name : false ;
     }
 
     /**
+     * 关联权限名称
+     *
      * @return \yii\db\ActiveQuery
      */
     public function getItemName()
     {
-        return $this->hasOne(AuthItem::className(), ['name' => 'item_name']);
+        return $this->hasOne(AuthItem::class, ['name' => 'item_name']);
+    }
+
+    /**
+     * 关联权限列表
+     *
+     * @return \yii\db\ActiveQuery
+     */
+    public function getAuthItemChild()
+    {
+        return $this->hasMany(AuthItemChild::class, ['parent' => 'item_name']);
+    }
+
+    /**
+     * 关联插件模块权限列表
+     *
+     * @return \yii\db\ActiveQuery
+     */
+    public function getAddonsAuthItemChild()
+    {
+        return $this->hasMany(AddonsAuthItemChild::class, ['parent' => 'item_name']);
     }
 
     /**
@@ -112,7 +132,7 @@ class AuthAssignment extends \common\models\common\BaseModel
     {
         return [
             [
-                'class' => TimestampBehavior::className(),
+                'class' => TimestampBehavior::class,
                 'attributes' => [
                     ActiveRecord::EVENT_BEFORE_INSERT => ['created_at'],
                 ],

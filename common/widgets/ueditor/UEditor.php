@@ -6,15 +6,17 @@ use yii\helpers\Html;
 use yii\helpers\Url;
 use yii\helpers\Json;
 use yii\helpers\ArrayHelper;
+use yii\widgets\InputWidget;
 use common\widgets\ueditor\assets\AppAsset;
 
 /**
  * 百度编辑器上传
  *
  * Class UEditor
- * @package common\widgets\webuploader
+ * @package common\widgets\ueditor
+ * @author jianyan74 <751393839@qq.com>
  */
-class UEditor extends \yii\widgets\InputWidget
+class UEditor extends InputWidget
 {
     /**
      * ueditor参数配置
@@ -24,16 +26,9 @@ class UEditor extends \yii\widgets\InputWidget
     public $config = [];
 
     /**
-     * 默认名称
-     *
-     * @var string
+     * @var array
      */
-    public $name;
-
-    /**
-     * @var string|array
-     */
-    public $value;
+    public $formData = [];
 
     /**
      * @throws \yii\base\InvalidConfigException
@@ -76,7 +71,11 @@ class UEditor extends \yii\widgets\InputWidget
             ],
         ];
 
+        if (!empty($this->config['toolbars'])) unset($config['toolbars']);
         $this->config = ArrayHelper::merge($config, $this->config);
+        $this->formData = ArrayHelper::merge([
+            'drive' => 'local',
+        ], $this->formData);
     }
 
     /**
@@ -87,15 +86,32 @@ class UEditor extends \yii\widgets\InputWidget
         $id = $this->hasModel() ? Html::getInputId($this->model, $this->attribute) : $this->id;
         $config = Json::encode($this->config);
 
+        //  由于百度上传不能传递数组，所以转码成为json
+        !isset($this->formData) && $this->formData = [];
+        foreach ($this->formData as $key => &$formDatum)
+        {
+            if (!empty($formDatum) && is_array($formDatum))
+            {
+                $formDatum = Json::encode($formDatum);
+            }
+        }
+
+        $formData = Json::encode($this->formData);
+        
         //ready部分代码，是为了缩略图管理。UEditor本身就很大，在后台直接加载大文件图片会很卡。
         $script = <<<UEDITOR
-        UE.getEditor('{$id}',{$config}).ready(function(){
+        UE.delEditor('{$id}');
+        var ue = UE.getEditor('{$id}',{$config}).ready(function(){
             this.addListener( "beforeInsertImage", function ( type, imgObjs ) {
                 for(var i=0;i < imgObjs.length;i++){
                     imgObjs[i].src = imgObjs[i].src.replace(".thumbnail","");
                 }
             });
-    });
+            
+        this.execCommand('serverparam', function(editor) {
+                    return {$formData};
+                });
+        });
 UEDITOR;
 
         $this->getView()->registerJs($script);

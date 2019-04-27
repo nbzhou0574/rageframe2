@@ -9,13 +9,13 @@ use yii\widgets\InputWidget;
 use yii\base\InvalidConfigException;
 use common\helpers\StringHelper;
 use common\widgets\webuploader\assets\AppAsset;
-use common\widgets\webuploader\assets\WebuploaderAsset;
 
 /**
- * 文件上传小工具
+ * 文经上传
  *
  * Class Files
  * @package common\widgets\webuploader
+ * @author jianyan74 <751393839@qq.com>
  */
 class Files extends InputWidget
 {
@@ -27,18 +27,6 @@ class Files extends InputWidget
     public $config = [];
 
     /**
-     * 默认名称
-     *
-     * @var string
-     */
-    public $name;
-
-    /**
-     * @var string|array
-     */
-    public $value;
-
-    /**
      * 盒子ID
      *
      * @var
@@ -46,7 +34,8 @@ class Files extends InputWidget
     protected $boxId;
 
     /**
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
+     * @throws \Exception
      */
     public function init()
     {
@@ -56,7 +45,8 @@ class Files extends InputWidget
             'compress' => false, // 压缩
             'auto' => true, // 自动上传
             'formData' => [
-                 'guid' => null,
+                'guid' => null,
+                'drive' => Yii::$app->params['uploadConfig']['files']['drive'], // 默认本地 可修改 qiniu/oss 上传
             ], // 表单参数
             'pick' => [
                 'id' => '.upload-album-' . $this->boxId,
@@ -81,8 +71,9 @@ class Files extends InputWidget
             /**-------------- 自定义的参数 ----------------**/
             'uploadType' => 'file',
             'independentUrl' => false, // 独立上传地址,不受全局的地址上传影响
-            'callback' => null,
+            'callback' => null, // 上传成功回调js方法
             'name' => $this->name,
+            'select' => true, // 显示选择文件
         ], $this->config);
 
         if (!empty(Yii::$app->params['uploadConfig']['files']['takeOverUrl']) && $this->config['independentUrl'] == false)
@@ -115,10 +106,14 @@ class Files extends InputWidget
             }
         }
 
-        // 由于百度编辑器不能传递数组，所以转码成为json
-        if (isset($this->config['formData']['thumb']))
+        //  由于百度上传不能传递数组，所以转码成为json
+        !isset($this->config['formData']) && $this->config['formData'] = [];
+        foreach ($this->config['formData'] as $key => &$formDatum)
         {
-            $this->config['formData']['thumb'] = json_encode($this->config['formData']['thumb']);
+            if (!empty($formDatum) && is_array($formDatum))
+            {
+                $formDatum = json_encode($formDatum);
+            }
         }
 
         return $this->render('file', [
@@ -135,7 +130,6 @@ class Files extends InputWidget
     protected function registerClientScript()
     {
         $view = $this->getView();
-        WebuploaderAsset::register($view);
         AppAsset::register($view);
     }
 }

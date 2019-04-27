@@ -9,6 +9,7 @@ use common\models\common\PayLog;
  *
  * Class PayHelper
  * @package common\helpers
+ * @author jianyan74 <751393839@qq.com>
  */
 class PayHelper
 {
@@ -19,9 +20,10 @@ class PayHelper
      * @param string $orderSn 关联订单号
      * @param int $orderGroup 订单组别 如果有自己的多种订单类型请去\common\models\common\PayLog里面增加对应的常量
      * @param int $payType 支付类型 1:微信;2:支付宝;3:银联;4:微信小程序
+     * @param string $tradeType 支付方式
      * @return string
      */
-    public static function getOutTradeNo($totalFee, string $orderSn, int $orderGroup, int $payType, $tradeType)
+    public static function getOutTradeNo($totalFee, string $orderSn, int $payType, $tradeType = 'JSAPI', $orderGroup = 1)
     {
         $payModel = new PayLog();
         $payModel->out_trade_no = time() . StringHelper::randomNum();
@@ -64,5 +66,25 @@ class PayHelper
         }
 
         return false;
+    }
+
+    /**
+     * 告诉微信已经成功了
+     *
+     * @return bool|string
+     */
+    public static function notifyWechatSuccess()
+    {
+        return ArrayHelper::toXml(['return_code' => 'SUCCESS', 'return_msg' => 'OK']);
+    }
+
+    /**
+     * 告诉微信失败了
+     *
+     * @return bool|string
+     */
+    public static function notifyWechatFail()
+    {
+        return ArrayHelper::toXml(['return_code' => 'FAIL', 'return_msg' => 'OK']);
     }
 }

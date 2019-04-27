@@ -1,8 +1,9 @@
 <?php
 namespace common\models\sys;
 
-use common\enums\StatusEnum;
 use Yii;
+use common\helpers\AuthHelper;
+use common\enums\StatusEnum;
 use common\helpers\ArrayHelper;
 
 /**
@@ -15,6 +16,7 @@ use common\helpers\ArrayHelper;
  * @property string $menu_css 样式
  * @property int $sort 排序
  * @property int $level 级别
+ * @property string $params 参数
  * @property string $cate_id menu:菜单;sys:系统菜单
  * @property int $dev 开发者[0:都可见;开发模式可见]
  * @property int $status 状态[-1:删除;0:禁用;1启用]
@@ -43,6 +45,7 @@ class Menu extends \common\models\common\BaseModel
             ['url', 'default', 'value' => "#"],
             [['pid','sort'], 'default', 'value' => 0],
             [['level'], 'default', 'value' => 1],
+            [['params'], 'safe'],
         ];
     }
 
@@ -59,8 +62,9 @@ class Menu extends \common\models\common\BaseModel
             'menu_css' => '图标css',
             'sort' => '排序',
             'level' => '级别',
+            'params' => '参数',
             'cate_id' => '分类',
-            'dev' => '开发模式可见',
+            'dev' => '仅开发模式可见',
             'status' => '状态',
             'created_at' => '创建时间',
             'updated_at' => '修改时间',
@@ -75,20 +79,43 @@ class Menu extends \common\models\common\BaseModel
      */
     public static function getList($status = false)
     {
-        $data = Menu::find()
-            ->andFilterWhere(['status' => $status]);
-
+        $data = Menu::find()->andFilterWhere(['status' => $status]);
+        // 关闭开发模式
         if (empty(Yii::$app->debris->config('sys_dev')))
         {
             $data = $data->andWhere(['dev' => StatusEnum::DISABLED]);
         }
 
-        $models = $data->orderBy('cate_id asc,sort asc')
-            ->with('cate')
+        $models = $data->orderBy('cate_id asc, sort asc')
+            ->with(['cate'])
             ->asArray()
             ->all();
 
-        return ArrayHelper::itemsMerge($models, 'id');
+        // 获取当前所有的权限信息
+        $auth = Yii::$app->services->sys->isAuperAdmin() ? false : AuthHelper::getAuth();
+        foreach ($models as $key => &$model)
+        {
+            // 判断权限是否拥有且支持参数传递
+            if (false === $auth || in_array($model['url'], $auth))
+            {
+                $params = unserialize($model['params']);
+                empty($params) && $params = [];
+                $model['fullUrl'][] = $model['url'];
+                foreach ($params as $param)
+                {
+                    if (!empty($param['key']))
+                    {
+                        $model['fullUrl'][$param['key']] = $param['value'];
+                    }
+                }
+            }
+            else
+            {
+                unset($models[$key]);
+            }
+        }
+
+        return ArrayHelper::itemsMerge($models);
     }
 
     /**
@@ -98,18 +125,17 @@ class Menu extends \common\models\common\BaseModel
      */
     public function getCate()
     {
-        return $this->hasOne(MenuCate::className(), ['id' => 'cate_id']);
+        return $this->hasOne(MenuCate::class, ['id' => 'cate_id']);
     }
 
     /**
-     * 删除子菜单
-     *
+     * 删除全部子类
+     * 
      * @return bool
      */
     public function beforeDelete()
     {
-        $menus = self::find()->all();
-        $ids = ArrayHelper::getChildsId($menus, $this->id);
+        $ids = ArrayHelper::getChildIds(self::find()->all(), $this->id);
         self::deleteAll(['in', 'id', $ids]);
 
         return parent::beforeDelete();

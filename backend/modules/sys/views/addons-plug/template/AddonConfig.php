@@ -36,6 +36,21 @@ class AddonConfig
     ];
 
     /**
+     * 可授权权限
+     *
+     * 注意：采用Yii2的路由命名方式
+     * 例子：array(
+     *          'index/index' => '首页',
+     *          'cate-index/index' => '分类首页',
+     *          'cate-index/first-data' => '分类数据',
+     *        )
+     * @var array
+     */
+    public $authItem = [
+
+    ];
+
+    /**
      * 参数配置
      *
      * @var bool
@@ -50,7 +65,7 @@ class AddonConfig
     public $isHook = <?= $model['is_hook'] == true ? 'true' : 'false' ?>;
 
     /**
-     * 小程序
+     * Api/小程序
      *
      * @var bool
      */
@@ -102,13 +117,16 @@ class AddonConfig
      * @var array
      */
     public $menu = [
-<?php for ($i = 0; $i < $menuCount; $i++){ ?>
+<?php for ($i = 0; $i < $menuCount; $i++){
+    if (!empty($menus['title'][$i]) && !empty($menus['route'][$i])){
+        ?>
         [
             'title' => '<?= $menus['title'][$i]; ?>',
             'route' => '<?= $menus['route'][$i]; ?>',
             'icon' => '<?= $menus['icon'][$i]; ?>'
         ],
-<?php } ?>
+<?php }
+} ?>
     ];
 
     /**
@@ -117,13 +135,16 @@ class AddonConfig
      * @var array
      */
     public $cover = [
-<?php for ($i = 0; $i < $coverCount; $i++){ ?>
+<?php for ($i = 0; $i < $coverCount; $i++){
+    if (!empty($covers['title'][$i]) && !empty($covers['route'][$i])){
+        ?>
         [
             'title' => '<?= $covers['title'][$i]; ?>',
             'route' => '<?= $covers['route'][$i]; ?>',
             'icon' => '<?= $covers['icon'][$i]; ?>'
         ],
-<?php } ?>
+<?php }
+}?>
     ];
 
     /**

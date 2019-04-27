@@ -12,6 +12,7 @@ use addons\RfExample\common\models\ElasticSearchCurd;
 /**
  * Class ElasticSearchController
  * @package addons\RfExample\backend\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class ElasticSearchController extends AddonsBaseController
 {
@@ -26,6 +27,8 @@ class ElasticSearchController extends AddonsBaseController
      */
     public function init()
     {
+        /** ------ 全文搜索引擎 ------ **/
+
         // 配置了es的集群，那么需要在http_address中把每一个节点的ip都要配置上
         Yii::$app->set('elasticsearch', [
             'class' => 'yii\elasticsearch\Connection',
@@ -55,7 +58,7 @@ class ElasticSearchController extends AddonsBaseController
         $data = ElasticSearchCurd::find();
         $pages = new Pagination([
             'totalCount' => $data->count(),
-            'pageSize' => $this->_pageSize
+            'pageSize' => $this->pageSize
         ]);
 
         // sort 字段按照desc的方式进行排序
@@ -127,6 +130,7 @@ class ElasticSearchController extends AddonsBaseController
      *
      * @param $id
      * @return ElasticSearchCurd|null
+     * @throws \Exception
      */
     protected function findModel($id)
     {

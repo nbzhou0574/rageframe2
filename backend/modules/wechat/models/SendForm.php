@@ -2,15 +2,20 @@
 namespace backend\modules\wechat\models;
 
 use Yii;
+use common\enums\StatusEnum;
+use common\helpers\ArrayHelper;
 use common\models\wechat\FansTags;
 use common\models\wechat\MassRecord;
 
 /**
  * Class SendForm
  * @package backend\modules\wechat\models
+ * @author jianyan74 <751393839@qq.com>
  */
 class SendForm extends MassRecord
 {
+    public $send_type = 1;
+
     /**
      * 群发消息
      *
@@ -26,36 +31,68 @@ class SendForm extends MassRecord
     ];
 
     /**
-     * 群发消息
+     * @return array
      */
-    public function send()
+    public function rules()
+    {
+        $rules = parent::rules();
+        $rules[] = ['send_type', 'integer'];
+
+        return $rules;
+    }
+
+    /**
+     * @return array
+     */
+    public function attributeLabels()
+    {
+        return ArrayHelper::merge(parent::attributeLabels(), [
+            'send_type' => '发送类型'
+        ]);
+    }
+
+    /**
+     * 群发消息
+     *
+     * @param bool $immediately
+     * @return bool
+     * @throws \EasyWeChat\Kernel\Exceptions\HttpException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \Psr\SimpleCache\InvalidArgumentException
+     * @throws \yii\web\UnprocessableEntityHttpException
+     */
+    public function send($immediately = true)
     {
         $app = Yii::$app->wechat->app;
         $method = $this->sendMethod[$this->media_type];
 
+        $sendContent = $method == 'sendText' ? $this->content : $this->media_id;
+
+        // 立即发送写入时间
+        $immediately == true && $this->send_time = $this->final_send_time = time();
+
         if (!$this->tag_id)
         {
             $this->tag_name = '全部粉丝';
-            $result = $app->broadcasting->$method($this->media_id);
+            $immediately == true && $result = $app->broadcasting->$method($sendContent);
         }
         else
         {
-            $result = $app->broadcasting->$method($this->media_id, $this->tag_id);
+            $immediately == true && $result = $app->broadcasting->$method($sendContent, $this->tag_id);
             // 获取分组信息
-            $tag = FansTags::getFindID($this->tag_id);
+            $tag = FansTags::findById($this->tag_id);
             $this->tag_name = $tag['name'];
             $this->fans_num = $tag['count'];
         }
 
-        // 解析微信接口是否报错.报错则抛出错误信息
-        Yii::$app->debris->analyWechatPortBack($result, false);
-
-        if (Yii::$app->debris->getWechatPortBackError() == false)
+        if (!empty($result))
         {
+            Yii::$app->debris->getWechatError($result);
             $this->msg_id = $result['msg_id'];
-            return $this->save();
+            $this->send_status = StatusEnum::ENABLED;
         }
 
-        return false;
+        return $this->save();
     }
 }

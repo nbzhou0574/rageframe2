@@ -62,6 +62,7 @@ class MenuCate extends \common\models\common\BaseModel
     {
         return self::find()
             ->where(['status' => StatusEnum::ENABLED])
+            ->orderBy('sort asc')
             ->all();
     }
 
@@ -77,5 +78,19 @@ class MenuCate extends \common\models\common\BaseModel
             ->one();
 
         return $model ? $model->id : null;
+    }
+
+    /**
+     * @param bool $insert
+     * @return bool
+     */
+    public function beforeSave($insert)
+    {
+        if ($this->is_default_show == StatusEnum::ENABLED)
+        {
+            self::updateAll(['is_default_show' => StatusEnum::DISABLED], ['is_default_show' => StatusEnum::ENABLED]);
+        }
+
+        return parent::beforeSave($insert);
     }
 }

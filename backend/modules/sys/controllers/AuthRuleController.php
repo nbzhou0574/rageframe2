@@ -13,6 +13,7 @@ use common\components\CurdTrait;
  *
  * Class AuthRuleController
  * @package backend\modules\sys\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class AuthRuleController extends SController
 {
@@ -31,7 +32,7 @@ class AuthRuleController extends SController
     public function actionIndex()
     {
         $data = AuthRule::find();
-        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->_pageSize]);
+        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->pageSize]);
         $models = $data->offset($pages->offset)
             ->orderBy('created_at desc')
             ->limit($pages->limit)
@@ -44,7 +45,7 @@ class AuthRuleController extends SController
     }
 
     /**
-     * 编辑/新增
+     * 编辑/创建
      *
      * @return array|mixed|string|Response
      */

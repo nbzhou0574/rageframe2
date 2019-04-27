@@ -1,5 +1,4 @@
 <?php
-
 namespace common\models\wechat;
 
 use Yii;
@@ -52,6 +51,8 @@ class FansTags extends \common\models\common\BaseModel
      * 获取标签信息
      *
      * @return mixed
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \yii\web\UnprocessableEntityHttpException
      */
     public static function getList()
     {
@@ -67,9 +68,11 @@ class FansTags extends \common\models\common\BaseModel
      * 获取单个标签信息
      *
      * @param $id
-     * @return mixed
+     * @return array|bool|null|\yii\db\ActiveRecord
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \yii\web\UnprocessableEntityHttpException
      */
-    public static function getFindID($id)
+    public static function findById($id)
     {
         if (empty(($model = self::find()->one())))
         {
@@ -95,19 +98,16 @@ class FansTags extends \common\models\common\BaseModel
      * 获取标签信息并保存到数据库
      *
      * @return mixed
+     * @throws \EasyWeChat\Kernel\Exceptions\HttpException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \Psr\SimpleCache\InvalidArgumentException
+     * @throws \yii\web\UnprocessableEntityHttpException
      */
     public static function updateList()
     {
-        $app = Yii::$app->wechat->app;
-
-        try
-        {
-            $list = $app->user_tag->list();
-        }
-        catch (\Exception $e)
-        {
-
-        }
+        $list = Yii::$app->wechat->app->user_tag->list();
+        Yii::$app->debris->getWechatError($list);
 
         $tags = $list['tags'];
         if (empty(($model = FansTags::find()->one())))

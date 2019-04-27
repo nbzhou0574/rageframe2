@@ -37,7 +37,7 @@ class MongoDbCurd extends ActiveRecord
      */
     public function attributes()
     {
-        return array_keys($this->attributes());
+        return array_keys($this->attributeLabels());
     }
 
     /**
@@ -47,7 +47,8 @@ class MongoDbCurd extends ActiveRecord
     {
         return [
             [['title', 'status', 'cover', 'longitude', 'latitude'], 'required'],
-            [['sort', 'created_at', 'updated_at'], 'integer'],
+            [['sort', 'created_at', 'updated_at', 'status'], 'integer'],
+            [['sort', 'created_at', 'updated_at', 'status'], 'filter', 'filter' => 'intval'],
             [['author'], 'safe'],
         ];
     }
@@ -66,8 +67,8 @@ class MongoDbCurd extends ActiveRecord
             'author' => '作者',
             'longitude' => '经度',
             'latitude' => '纬度',
-            'created_at' => 'Created At',
-            'updated_at' => 'Updated At',
+            'created_at' => '创建时间',
+            'updated_at' => '更新时间',
         ];
     }
 
@@ -78,7 +79,7 @@ class MongoDbCurd extends ActiveRecord
     {
         return [
             [
-                'class' => TimestampBehavior::className(),
+                'class' => TimestampBehavior::class,
                 'attributes' => [
                     ActiveRecord::EVENT_BEFORE_INSERT => ['created_at', 'updated_at'],
                     ActiveRecord::EVENT_BEFORE_UPDATE => ['updated_at'],

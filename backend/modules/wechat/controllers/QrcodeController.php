@@ -12,6 +12,7 @@ use common\helpers\ResultDataHelper;
  *
  * Class QrcodeController
  * @package backend\modules\wechat\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class QrcodeController extends WController
 {
@@ -21,7 +22,7 @@ class QrcodeController extends WController
     public function actionIndex()
     {
         $data = Qrcode::find();
-        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->_pageSize]);
+        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->pageSize]);
         $models = $data->offset($pages->offset)
             ->orderBy('id desc')
             ->limit($pages->limit)
@@ -36,7 +37,7 @@ class QrcodeController extends WController
     /**
      * 创建
      *
-     * @return string|yii\web\Response
+     * @return mixed|string|Response
      */
     public function actionAdd()
     {
@@ -45,8 +46,7 @@ class QrcodeController extends WController
 
         if ($model->load(Yii::$app->request->post()) && $model->validate())
         {
-
-            $qrcode = $this->app->qrcode;
+            $qrcode = Yii::$app->wechat->app->qrcode;
             try
             {
                 if ($model->model == Qrcode::MODEL_TEM)
@@ -68,7 +68,7 @@ class QrcodeController extends WController
             }
             catch (\Exception $e)
             {
-                return $this->message($e->getMessage(), $this->redirect(['index']), 'error', 0, false);
+                return $this->message($e->getMessage(), $this->redirect(['index']), 'error');
             }
 
             return $this->redirect(['index']);
@@ -88,7 +88,6 @@ class QrcodeController extends WController
     {
         $id = Yii::$app->request->get('id');
         $model = Qrcode::findOne($id);
-
         if ($model->load(Yii::$app->request->post()) && $model->save())
         {
             return $this->redirect(['index']);
@@ -153,9 +152,8 @@ class QrcodeController extends WController
     {
         $id = Yii::$app->request->get('id');
         $model = Qrcode::findOne($id);
+        $url = Yii::$app->wechat->app->qrcode->url($model['ticket']);
 
-        $qrcode = $this->app->qrcode;
-        $url = $qrcode->url($model['ticket']);
         header("Cache-control:private");
         header('content-type:image/jpeg');
         header('content-disposition: attachment;filename="' . $model['name'] . '_' . time() . '.jpg"');
@@ -166,28 +164,29 @@ class QrcodeController extends WController
      * 长链接二维码
      *
      * @return array|string
+     * @throws \EasyWeChat\Kernel\Exceptions\HttpException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \EasyWeChat\Kernel\Exceptions\RuntimeException
+     * @throws \Psr\SimpleCache\InvalidArgumentException
+     * @throws \yii\web\UnprocessableEntityHttpException
      */
     public function actionLongUrl()
     {
         if (Yii::$app->request->isAjax)
         {
             $postUrl = Yii::$app->request->post('shortUrl', '');
+
             // 长链接转短链接
-            $url = $this->app->url;
-            try
+            $shortUrl = Yii::$app->wechat->app->url->shorten($postUrl);
+            if ($error = Yii::$app->debris->getWechatError($shortUrl, false))
             {
-                $shortUrl  = $url->shorten($postUrl);
-                if ($shortUrl['errcode'] == 0)
-                {
-                    return ResultDataHelper::result(200, '二维码转化成功', [
-                        'short_url' => $shortUrl['short_url']
-                    ]);
-                }
+                return ResultDataHelper::json(422, $error);
             }
-            catch (\Exception $e)
-            {
-                return ResultDataHelper::result(429, $e->getMessage());
-            }
+
+            return ResultDataHelper::json(200, '二维码转化成功', [
+                'short_url' => $shortUrl['short_url']
+            ]);
         }
 
         return $this->render('long-url', [

@@ -2,8 +2,8 @@
 namespace frontend\controllers;
 
 use Yii;
-use yii\base\InvalidParamException;
 use yii\web\BadRequestHttpException;
+use yii\web\UnprocessableEntityHttpException;
 use yii\web\Controller;
 use yii\filters\VerbFilter;
 use yii\filters\AccessControl;
@@ -14,7 +14,9 @@ use frontend\models\SignupForm;
 use frontend\models\ContactForm;
 
 /**
- * Site controller
+ * Class SiteController
+ * @package frontend\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class SiteController extends Controller
 {
@@ -25,7 +27,7 @@ class SiteController extends Controller
     {
         return [
             'access' => [
-                'class' => AccessControl::className(),
+                'class' => AccessControl::class,
                 'only' => ['logout', 'signup'],
                 'rules' => [
                     [
@@ -41,7 +43,7 @@ class SiteController extends Controller
                 ],
             ],
             'verbs' => [
-                'class' => VerbFilter::className(),
+                'class' => VerbFilter::class,
                 'actions' => [
                     'logout' => ['post'],
                 ],
@@ -62,7 +64,27 @@ class SiteController extends Controller
                 'class' => 'yii\captcha\CaptchaAction',
                 'fixedVerifyCode' => YII_ENV_TEST ? 'testme' : null,
             ],
+            'auth' => [
+                'class' => 'yii\authclient\AuthAction',
+                'successCallback' => [$this, 'successCallback'],
+            ],
         ];
+    }
+
+    /**
+     * Success Callback
+     * @param QqAuth|WeiboAuth $client
+     * @see http://wiki.connect.qq.com/get_user_info
+     * @see http://stuff.cebe.cc/yii2docs/yii-authclient-authaction.html
+     */
+    public function successCallback($client)
+    {
+        $id = $client->getId(); // qq | sina | weixin
+        $attributes = $client->getUserAttributes(); // basic info
+        $openid = $client->getOpenid(); //user openid
+        $userInfo = $client->getUserInfo(); // user extend info
+
+        var_dump($id, $attributes, $openid, $userInfo);
     }
 
     /**
@@ -76,26 +98,27 @@ class SiteController extends Controller
     }
 
     /**
-     * Logs in a user.
+     * 登录
      *
-     * @return mixed
+     * @return string|\yii\web\Response
      */
     public function actionLogin()
     {
-        if (!Yii::$app->user->isGuest) {
+        if (!Yii::$app->user->isGuest)
+        {
             return $this->goHome();
         }
 
         $model = new LoginForm();
-        if ($model->load(Yii::$app->request->post()) && $model->login()) {
+        if ($model->load(Yii::$app->request->post()) && $model->login())
+        {
             return $this->goBack();
-        } else {
-            $model->password = '';
-
-            return $this->render('login', [
-                'model' => $model,
-            ]);
         }
+
+        $model->password = '';
+        return $this->render('login', [
+            'model' => $model,
+        ]);
     }
 
     /**
@@ -111,30 +134,34 @@ class SiteController extends Controller
     }
 
     /**
-     * Displays contact page.
+     * 联系我们
      *
      * @return mixed
      */
     public function actionContact()
     {
         $model = new ContactForm();
-        if ($model->load(Yii::$app->request->post()) && $model->validate()) {
-            if ($model->sendEmail(Yii::$app->params['adminEmail'])) {
-                Yii::$app->session->setFlash('success', 'Thank you for contacting us. We will respond to you as soon as possible.');
-            } else {
-                Yii::$app->session->setFlash('error', 'There was an error sending your message.');
+        if ($model->load(Yii::$app->request->post()) && $model->validate())
+        {
+            if ($model->sendEmail(Yii::$app->params['adminEmail']))
+            {
+                Yii::$app->session->setFlash('success', '谢谢你联系我们。我们会尽快回复你.');
+            }
+            else
+            {
+                Yii::$app->session->setFlash('error', '发送你的信息时出错了.');
             }
 
             return $this->refresh();
-        } else {
-            return $this->render('contact', [
-                'model' => $model,
-            ]);
         }
+
+        return $this->render('contact', [
+            'model' => $model,
+        ]);
     }
 
     /**
-     * Displays about page.
+     * 关于
      *
      * @return mixed
      */
@@ -144,6 +171,8 @@ class SiteController extends Controller
     }
 
     /**
+     * 注册
+     *
      * @return string|\yii\web\Response
      * @throws \yii\base\Exception
      */
@@ -152,12 +181,9 @@ class SiteController extends Controller
         $model = new SignupForm();
         if ($model->load(Yii::$app->request->post()) && $model->validate())
         {
-            if ($user = $model->signup())
+            if (($user = $model->signup()) && Yii::$app->getUser()->login($user))
             {
-                if (Yii::$app->getUser()->login($user))
-                {
-                    return $this->goHome();
-                }
+                return $this->goHome();
             }
         }
 
@@ -167,9 +193,10 @@ class SiteController extends Controller
     }
 
     /**
-     * Requests password reset.
+     * 发送重置密码邮件
      *
-     * @return mixed
+     * @return string|\yii\web\Response
+     * @throws \yii\base\Exception
      */
     public function actionRequestPasswordReset()
     {
@@ -178,14 +205,12 @@ class SiteController extends Controller
         {
             if ($model->sendEmail())
             {
-                Yii::$app->session->setFlash('success', 'Check your email for further instructions.');
+                Yii::$app->session->setFlash('success', '查看您的电子邮件以获得进一步的指示.');
 
                 return $this->goHome();
             }
-            else
-            {
-                Yii::$app->session->setFlash('error', 'Sorry, we are unable to reset password for the provided email address.');
-            }
+
+            Yii::$app->session->setFlash('error', '对不起，我们无法为提供的电子邮件地址重置密码.');
         }
 
         return $this->render('requestPasswordResetToken', [
@@ -194,11 +219,12 @@ class SiteController extends Controller
     }
 
     /**
-     * Resets password.
+     * 密码重置
      *
-     * @param string $token
-     * @return mixed
+     * @param $token
+     * @return string|\yii\web\Response
      * @throws BadRequestHttpException
+     * @throws \yii\base\Exception
      */
     public function actionResetPassword($token)
     {
@@ -206,7 +232,7 @@ class SiteController extends Controller
         {
             $model = new ResetPasswordForm($token);
         }
-        catch (InvalidParamException $e)
+        catch (UnprocessableEntityHttpException $e)
         {
             throw new BadRequestHttpException($e->getMessage());
         }

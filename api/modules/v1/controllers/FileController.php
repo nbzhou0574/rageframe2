@@ -2,7 +2,9 @@
 namespace api\modules\v1\controllers;
 
 use Yii;
+use yii\web\NotFoundHttpException;
 use common\helpers\UploadHelper;
+use common\helpers\ResultDataHelper;
 use api\controllers\OnAuthController;
 
 /**
@@ -10,6 +12,8 @@ use api\controllers\OnAuthController;
  *
  * Class FileController
  * @package api\modules\v1\controllers
+ * @property \yii\db\ActiveRecord $modelClass
+ * @author jianyan74 <751393839@qq.com>
  */
 class FileController extends OnAuthController
 {
@@ -19,88 +23,133 @@ class FileController extends OnAuthController
      * 图片上传
      *
      * @return array
-     * @throws \yii\web\NotFoundHttpException
+     * @throws NotFoundHttpException
+     * @throws \League\Flysystem\FileExistsException
+     * @throws \Exception
      */
     public function actionImages()
     {
-        $result = UploadHelper::upload('file', 'images');
-        return [
-            'urlPath' => $result['relativePath'] . $result['name'],
-        ];
+        $upload = new UploadHelper(Yii::$app->request->post(), 'images');
+        $upload->verifyFile();
+        $upload->save();
+
+        return $upload->getBaseInfo();
     }
 
     /**
      * 视频上传
      *
      * @return array
-     * @throws \yii\web\NotFoundHttpException
+     * @throws NotFoundHttpException
+     * @throws \League\Flysystem\FileExistsException
+     * @throws \Exception
      */
     public function actionVideos()
     {
-        $result = UploadHelper::upload('file', 'videos');
-        return [
-            'urlPath' => $result['relativePath'] . $result['name'],
-        ];
+        $upload = new UploadHelper(Yii::$app->request->post(), 'videos');
+        $upload->verifyFile();
+        $upload->save();
+
+        return $upload->getBaseInfo();
     }
 
     /**
      * 语音上传
      *
      * @return array
-     * @throws \yii\web\NotFoundHttpException
+     * @throws NotFoundHttpException
+     * @throws \League\Flysystem\FileExistsException
+     * @throws \Exception
      */
     public function actionVoices()
     {
-        $result = UploadHelper::upload('file', 'voices');
-        return [
-            'urlPath' => $result['relativePath'] . $result['name'],
-        ];
+        $upload = new UploadHelper(Yii::$app->request->post(), 'voices');
+        $upload->verifyFile();
+        $upload->save();
+
+        return $upload->getBaseInfo();
     }
 
     /**
      * 文件上传
      *
      * @return array
-     * @throws \yii\web\NotFoundHttpException
+     * @throws NotFoundHttpException
+     * @throws \League\Flysystem\FileExistsException
+     * @throws \Exception
      */
     public function actionFiles()
     {
-        $result = UploadHelper::upload('file', 'files');
-        return [
-            'urlPath' => $result['relativePath'] . $result['name'],
-        ];
+        $upload = new UploadHelper(Yii::$app->request->post(), 'files');
+        $upload->verifyFile();
+        $upload->save();
+
+        return $upload->getBaseInfo();
     }
 
     /**
      * base64编码的图片上传
      *
      * @return array
-     * @throws \yii\web\NotFoundHttpException
+     * @throws NotFoundHttpException
+     * @throws \Exception
      */
-    public function actionBase64Img()
+    public function actionBase64()
     {
-        return UploadHelper::Base64Img(Yii::$app->request->post('image'), Yii::$app->request->post('extend', 'jpg'));
+        // 保存扩展名称
+        $extend = Yii::$app->request->post('extend', 'jpg');
+        !in_array($extend, Yii::$app->params['uploadConfig']['images']['extensions']) && $extend = 'jpg';
+        $data = Yii::$app->request->post('image', '');
+
+        $upload = new UploadHelper(Yii::$app->request->post(), 'images');
+        $upload->verifyBase64($data, $extend);
+        $upload->save(base64_decode($data));
+
+        return  $upload->getBaseInfo();
     }
 
     /**
-     * 七牛云存储
+     * 合并
      *
-     * @return array
+     * @return array|mixed
+     * @throws \League\Flysystem\FileExistsException
+     * @throws \League\Flysystem\FileNotFoundException
      * @throws \Exception
      */
-    public function actionQiniu()
+    public function actionMerge()
     {
-        return UploadHelper::qiniu($_FILES['file']);
+        $guid = Yii::$app->request->post('guid');
+        $mergeInfo = Yii::$app->cache->get(UploadHelper::PREFIX_MERGE_CACHE . $guid);
+
+        if (!$mergeInfo)
+        {
+            return ResultDataHelper::api(404, '找不到文件信息, 合并文件失败');
+        }
+
+        $upload = new UploadHelper($mergeInfo['config'], $mergeInfo['type']);
+        $upload->setPaths($mergeInfo['paths']);
+        $upload->setBaseInfo($mergeInfo['baseInfo']);
+        $upload->merge();
+
+        Yii::$app->cache->delete('upload-file-guid:' . $guid);
+
+        return $upload->getBaseInfo();
     }
 
     /**
-     * 阿里云OSS上传
+     * 权限验证
      *
-     * @return array
-     * @throws \Exception
+     * @param string $action 当前的方法
+     * @param null $model 当前的模型类
+     * @param array $params $_GET变量
+     * @throws \yii\web\BadRequestHttpException
      */
-    public function actionOss()
+    public function checkAccess($action, $model = null, $params = [])
     {
-        return UploadHelper::oss($_FILES['file']);
+        // 方法名称
+        if (in_array($action, ['index', 'view', 'update', 'create', 'delete']))
+        {
+            throw new \yii\web\BadRequestHttpException('权限不足');
+        }
     }
 }

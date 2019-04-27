@@ -10,6 +10,7 @@ use common\models\wechat\MenuProvinces;
  *
  * Class MenuProvincesController
  * @package backend\modules\wechat\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class MenuProvincesController extends WController
 {
@@ -21,12 +22,12 @@ class MenuProvincesController extends WController
     {
         $model = MenuProvinces::getMenuTitle($title);
 
-        $str = Html::tag('option', '不限', ['value' => '']) ;
+        $str = Html::tag('option', '不限', ['value' => '']);
         foreach($model as $value => $name)
         {
             $str .= Html::tag('option', Html::encode($name), ['value' => $value]);
         }
 
-        return ResultDataHelper::result(200, '查询成功', $str);
+        return ResultDataHelper::json(200, '查询成功', $str);
     }
 }

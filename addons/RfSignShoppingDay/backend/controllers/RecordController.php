@@ -10,6 +10,7 @@ use addons\RfSignShoppingDay\common\models\Record;
 /**
  * Class RecordController
  * @package addons\RfSignShoppingDay\backend\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class RecordController extends AddonsBaseController
 {
@@ -25,7 +26,7 @@ class RecordController extends AddonsBaseController
     public function actionIndex()
     {
         $data = Record::find()->where(['is_win' => 1]);
-        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->_pageSize]);
+        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->pageSize]);
         $models = $data->offset($pages->offset)
             ->orderBy('id desc')
             ->with('user')

@@ -51,10 +51,10 @@ rfSuccess(title,text)
 ```
 <tr id = "<?= $model['id']?>">
     <td>
-        <input type="text" class="form-control" value="<?= $model['sort']?>" onblur="rfSort(this)">
+         <?= \common\helpers\HtmlHelper::sort($model['sort']); ?>
     </td>
     <td>
-        <?= \common\helpers\HtmlHelper::statusSpan($model['status']); ?>
+        <?= \common\helpers\HtmlHelper::status($model['status']); ?>
     </td>
 </tr>
 ```

@@ -1,6 +1,8 @@
 <?php
 namespace backend\modules\wechat\controllers;
 
+use common\models\wechat\Attachment;
+use common\models\wechat\AttachmentNews;
 use yii;
 use yii\data\Pagination;
 use yii\web\Response;
@@ -9,10 +11,18 @@ use common\helpers\ResultDataHelper;
 use common\models\wechat\Fans;
 use common\models\wechat\FansTags;
 use common\models\wechat\FansTagMap;
+use common\models\wechat\Rule;
+use EasyWeChat\Kernel\Messages\Text;
+use EasyWeChat\Kernel\Messages\Image;
+use EasyWeChat\Kernel\Messages\Video;
+use EasyWeChat\Kernel\Messages\Voice;
+use EasyWeChat\Kernel\Messages\News;
+use EasyWeChat\Kernel\Messages\NewsItem;
 
 /**
  * Class FansController
  * @package backend\modules\wechat\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class FansController extends WController
 {
@@ -20,6 +30,8 @@ class FansController extends WController
      * 粉丝首页
      *
      * @return string
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws yii\web\UnprocessableEntityHttpException
      */
     public function actionIndex()
     {
@@ -31,7 +43,7 @@ class FansController extends WController
         $where = [];
         if ($keyword)
         {
-            $where = ['or', ['like', 'f.openid', $keyword],['like', 'f.nickname', $keyword]];
+            $where = ['or', ['like', 'f.openid', $keyword], ['like', 'f.nickname', $keyword]];
         }
 
         // 关联角色查询
@@ -42,7 +54,7 @@ class FansController extends WController
             ->joinWith("tags AS t", true, 'LEFT JOIN')
             ->filterWhere(['t.tag_id' => $tag_id]);
 
-        $pages  = new Pagination(['totalCount' =>$data->count(), 'pageSize' => $this->_pageSize]);
+        $pages  = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->pageSize]);
         $models = $data->offset($pages->offset)
             ->with('tags','member')
             ->orderBy('followtime desc, unfollowtime desc')
@@ -80,9 +92,85 @@ class FansController extends WController
     }
 
     /**
+     * 发送消息
+     *
+     * @param $id
+     * @return array|string
+     * @throws \EasyWeChat\Kernel\Exceptions\HttpException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \EasyWeChat\Kernel\Exceptions\RuntimeException
+     * @throws \Psr\SimpleCache\InvalidArgumentException
+     * @throws yii\web\UnprocessableEntityHttpException
+     */
+    public function actionSendMessage($openid)
+    {
+        $model = Fans::findOne(['openid' => $openid]);
+        if (Yii::$app->request->isPost)
+        {
+            $data = Yii::$app->request->post();
+            switch ($data['type'])
+            {
+                // 文字回复
+                case  1 :
+                    $message =  new Text($data['content']);
+                    break;
+                // 图片回复
+                case  2 :
+                    $message = new Image($data['images']);
+                    break;
+                // 图文回复
+                case  3 :
+                    $new = AttachmentNews::find()->where(['sort' => 0, 'attachment_id' => $data['news']])->one();
+                    $newsList[] = new NewsItem([
+                        'title' => $new['title'],
+                        'description' => $new['digest'],
+                        'url' => $new['media_url'],
+                        'image' => $new['thumb_url'],
+                    ]);
+
+                    $message = new News($newsList);
+                    break;
+                // 视频回复
+                case 4 :
+                    $message = new Video($data['video'], [
+                        'title' => $data['title'],
+                        'description' => $data['description'],
+                    ]);
+                    break;
+                // 语音回复
+                case 5 :
+                    $message = new Voice($data['voice']);
+                    break;
+                default :
+                    return ResultDataHelper::json(422, '找不到发送类型');
+                    break;
+            }
+
+            $result = Yii::$app->wechat->app->customer_service->message($message)->to($model['openid'])->send();
+            if ($error = Yii::$app->debris->getWechatError($result, false))
+            {
+                return ResultDataHelper::json(422, $error);
+            }
+
+            return ResultDataHelper::json(200, '发送成功');
+        }
+
+        return $this->renderAjax('send-message',[
+            'model' => $model
+        ]);
+    }
+
+    /**
      * 贴标签
+     *
      * @param $fan_id
      * @return string|Response
+     * @throws \EasyWeChat\Kernel\Exceptions\HttpException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \Psr\SimpleCache\InvalidArgumentException
+     * @throws yii\web\UnprocessableEntityHttpException
      */
     public function actionMoveTag($fan_id)
     {
@@ -109,7 +197,7 @@ class FansController extends WController
             {
                 if (!in_array($tag_id, $fansTags))
                 {
-                    $this->app->user_tag->tagUsers([$fans['openid']], $tag_id);
+                    Yii::$app->wechat->app->user_tag->tagUsers([$fans['openid']], $tag_id);
                 }
 
                 $model = new FansTagMap();
@@ -123,7 +211,7 @@ class FansController extends WController
             {
                 if (!in_array($tag_id, $tags))
                 {
-                    $this->app->user_tag->untagUsers([$fans['openid']], $tag_id);
+                    Yii::$app->wechat->app->user_tag->untagUsers([$fans['openid']], $tag_id);
                 }
             }
 
@@ -143,6 +231,7 @@ class FansController extends WController
      * 获取全部粉丝
      *
      * @return array
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
      * @throws yii\db\Exception
      */
     public function actionGetAllFans()
@@ -151,7 +240,7 @@ class FansController extends WController
         $next_openid = $request->get('next_openid', '');
 
         // 获取全部列表
-        $fans_list = $this->app->user->list();
+        $fans_list = Yii::$app->wechat->app->user->list();
         $fans_count = $fans_list['total'];
 
         // 设置关注全部为为关注
@@ -194,7 +283,7 @@ class FansController extends WController
             Fans::updateAll(['follow' => 1 ], ['in', 'openid', $fans]);
         }
 
-        return ResultDataHelper::result(200, '同步粉丝openid完成', [
+        return ResultDataHelper::json(200, '同步粉丝openid完成', [
             'total' => $fans_list['total'],
             'count' => !empty($fans_list['data']['openid']) ? $fans_count : 0,
             'next_openid' => $fans_list['next_openid'],
@@ -205,6 +294,7 @@ class FansController extends WController
      * 开始同步粉丝数据
      *
      * @return array
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
      * @throws yii\db\Exception
      */
     public function actionSync()
@@ -235,7 +325,7 @@ class FansController extends WController
                     Fans::sync($fans['openid']);
                 }
 
-                return ResultDataHelper::result(200, '同步完成', [
+                return ResultDataHelper::json(200, '同步完成', [
                     'page' => $page + 1
                 ]);
             }
@@ -247,7 +337,7 @@ class FansController extends WController
             $openids = $request->post('openids');
             if (empty($openids) || !is_array($openids))
             {
-                return ResultDataHelper::result(404, '请选择粉丝');
+                return ResultDataHelper::json(404, '请选择粉丝');
             }
 
             // 系统内的粉丝
@@ -266,6 +356,6 @@ class FansController extends WController
             }
         }
 
-        return ResultDataHelper::result(200, '同步完成');
+        return ResultDataHelper::json(200, '同步完成');
     }
 }

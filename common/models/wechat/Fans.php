@@ -1,5 +1,4 @@
 <?php
-
 namespace common\models\wechat;
 
 use Yii;
@@ -64,7 +63,7 @@ class Fans extends \common\models\common\BaseModel
             [['member_id', 'sex', 'follow', 'followtime', 'unfollowtime', 'group_id', 'last_updated', 'status', 'created_at', 'updated_at'], 'integer'],
             [['unionid'], 'string', 'max' => 64],
             [['openid', 'nickname'], 'string', 'max' => 50],
-            [['head_portrait'], 'string', 'max' => 255],
+            [['head_portrait'], 'string', 'max' => 150],
             [['tag'], 'string', 'max' => 1000],
             [['last_longitude', 'last_latitude'], 'string', 'max' => 10],
             [['last_address', 'country', 'province', 'city'], 'string', 'max' => 100],
@@ -81,32 +80,30 @@ class Fans extends \common\models\common\BaseModel
             'member_id' => 'Member ID',
             'unionid' => 'Unionid',
             'openid' => 'Openid',
-            'nickname' => 'Nickname',
-            'head_portrait' => 'Head Portrait',
-            'sex' => 'Sex',
-            'follow' => 'Follow',
-            'followtime' => 'Followtime',
-            'unfollowtime' => 'Unfollowtime',
+            'nickname' => '昵称',
+            'head_portrait' => '头像',
+            'sex' => '性别',
+            'follow' => '关注状态',
+            'followtime' => '关注时间',
+            'unfollowtime' => '取消关注时间',
             'group_id' => 'Group ID',
-            'tag' => 'Tag',
+            'tag' => '标签',
             'last_longitude' => 'Last Longitude',
             'last_latitude' => 'Last Latitude',
             'last_address' => 'Last Address',
             'last_updated' => 'Last Updated',
-            'country' => 'Country',
-            'province' => 'Province',
-            'city' => 'City',
-            'status' => 'Status',
-            'created_at' => 'Created At',
-            'updated_at' => 'Updated At',
+            'country' => '国家',
+            'province' => '省',
+            'city' => '市',
+            'status' => '状态',
+            'created_at' => '创建时间',
+            'updated_at' => '更新时间',
         ];
     }
 
     /**
-     * 关注
-     *
      * @param $openid
-     * @param $app
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
      */
     public static function follow($openid)
     {
@@ -145,6 +142,7 @@ class Fans extends \common\models\common\BaseModel
      * 同步关注的用户信息
      *
      * @param $openid
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
      * @throws \yii\db\Exception
      */
     public static function sync($openid)
@@ -204,7 +202,7 @@ class Fans extends \common\models\common\BaseModel
      */
     public function getMember()
     {
-        return $this->hasOne(MemberInfo::className(), ['id' => 'member_id']);
+        return $this->hasOne(MemberInfo::class, ['id' => 'member_id']);
     }
 
     /**
@@ -214,6 +212,6 @@ class Fans extends \common\models\common\BaseModel
      */
     public function getTags()
     {
-        return $this->hasMany(FansTagMap::className(),['fans_id' => 'id']);
+        return $this->hasMany(FansTagMap::class,['fans_id' => 'id']);
     }
 }

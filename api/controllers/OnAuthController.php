@@ -2,6 +2,7 @@
 namespace api\controllers;
 
 use Yii;
+use yii\rest\OptionsAction;
 use yii\data\ActiveDataProvider;
 use yii\web\NotFoundHttpException;
 use common\enums\StatusEnum;
@@ -12,6 +13,8 @@ use common\helpers\ResultDataHelper;
  *
  * Class OnAuthController
  * @package api\controllers
+ * @property yii\db\ActiveRecord|yii\base\Model $modelClass;
+ * @author jianyan74 <751393839@qq.com>
  */
 class OnAuthController extends ActiveController
 {
@@ -29,6 +32,26 @@ class OnAuthController extends ActiveController
     }
 
     /**
+     * @return array
+     */
+    protected function verbs()
+    {
+        // 判断是否插件模块进入
+        if (isset(Yii::$app->params['addon']))
+        {
+            return [];
+        }
+
+        return [
+            'index' => ['GET', 'HEAD'],
+            'view' => ['GET', 'HEAD'],
+            'create' => ['POST'],
+            'update' => ['PUT', 'PATCH'],
+            'delete' => ['DELETE'],
+        ];
+    }
+
+    /**
      * 验证更新是否本人
      *
      * @param $action
@@ -40,7 +63,7 @@ class OnAuthController extends ActiveController
      */
     public function beforeAction($action)
     {
-        if ($action == 'update' && Yii::$app->user->id != Yii::$app->request->get('id', null))
+        if ($action == 'update' && Yii::$app->user->identity->member_id != Yii::$app->request->get('id', null))
         {
             throw new NotFoundHttpException('权限不足.');
         }
@@ -49,6 +72,8 @@ class OnAuthController extends ActiveController
     }
 
     /**
+     * 首页
+     *
      * @return ActiveDataProvider
      */
     public function actionIndex()
@@ -68,16 +93,17 @@ class OnAuthController extends ActiveController
     /**
      * 创建
      *
-     * @return bool
+     * @return mixed|\yii\db\ActiveRecord
      */
     public function actionCreate()
     {
+        /* @var $model \yii\db\ActiveRecord */
         $model = new $this->modelClass();
         $model->attributes = Yii::$app->request->post();
-        $model->member_id = Yii::$app->user->id;
+        $model->member_id = Yii::$app->user->identity->member_id;
         if (!$model->save())
         {
-            return ResultDataHelper::apiResult(422, $this->analyErr($model->getFirstErrors()));
+            return ResultDataHelper::api(422, $this->analyErr($model->getFirstErrors()));
         }
 
         return $model;
@@ -87,7 +113,7 @@ class OnAuthController extends ActiveController
      * 更新
      *
      * @param $id
-     * @return bool|mixed
+     * @return mixed|\yii\db\ActiveRecord
      * @throws NotFoundHttpException
      */
     public function actionUpdate($id)
@@ -96,7 +122,7 @@ class OnAuthController extends ActiveController
         $model->attributes = Yii::$app->request->post();
         if (!$model->save())
         {
-            return ResultDataHelper::apiResult(422, $this->analyErr($model->getFirstErrors()));
+            return ResultDataHelper::api(422, $this->analyErr($model->getFirstErrors()));
         }
 
         return $model;
@@ -106,7 +132,7 @@ class OnAuthController extends ActiveController
      * 删除
      *
      * @param $id
-     * @return mixed
+     * @return bool
      * @throws NotFoundHttpException
      */
     public function actionDelete($id)
@@ -120,7 +146,7 @@ class OnAuthController extends ActiveController
      * 单个显示
      *
      * @param $id
-     * @return mixed
+     * @return \yii\db\ActiveRecord
      * @throws NotFoundHttpException
      */
     public function actionView($id)
@@ -130,11 +156,12 @@ class OnAuthController extends ActiveController
 
     /**
      * @param $id
-     * @return mixed
+     * @return \yii\db\ActiveRecord
      * @throws NotFoundHttpException
      */
     protected function findModel($id)
     {
+        /* @var $model \yii\db\ActiveRecord */
         if (empty($id) || !($model = $this->modelClass::find()->where(['id' => $id, 'status' => StatusEnum::ENABLED])->one()))
         {
             throw new NotFoundHttpException('请求的数据不存在或您的权限不足.');

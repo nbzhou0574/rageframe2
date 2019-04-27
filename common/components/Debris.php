@@ -3,31 +3,18 @@ namespace common\components;
 
 use Yii;
 use common\models\sys\Config;
-use common\models\sys\ActionLog;
+use yii\web\UnprocessableEntityHttpException;
 
 /**
  * 碎片组件
  *
  * Class Debris
  * @package common\components
+ * @author jianyan74 <751393839@qq.com>
  */
 class Debris
 {
-    /**
-     * 缓存前缀
-     *
-     * @var array
-     */
-    protected $_prefix = [
-        'cache' => "backendSysConfig", // 缓存
-    ];
-
-    /**
-     * 微信接口报错
-     *
-     * @var
-     */
-    protected $_wechatError = false;
+    const CACHE_PREFIX = 'backendSysConfig'; // 缓存前缀
 
     /**
      * 返回配置名称
@@ -56,6 +43,14 @@ class Debris
     }
 
     /**
+     * 清除缓存
+     */
+    public function clearConfigCache()
+    {
+        Yii::$app->cache->delete(self::CACHE_PREFIX);
+    }
+
+    /**
      * 获取全部配置信息
      *
      * @param bool $noCache true 不从缓存读取 false 从缓存读取
@@ -64,28 +59,15 @@ class Debris
     protected function getConfigInfo($noCache)
     {
         // 获取缓存信息
-        $cacheKey = $this->_prefix['cache'];
+        $cacheKey = self::CACHE_PREFIX;
         if (!($info = Yii::$app->cache->get($cacheKey)) || $noCache == true)
         {
             $info = Config::getList();
             // 设置缓存
-            Yii::$app->cache->set($cacheKey, $info);
+            Yii::$app->cache->set($cacheKey, $info, 60 * 60);
         }
 
         return $info;
-    }
-
-    /**
-     * 行为日志
-     *
-     * @param string $behavior 行为
-     * @param string $remark 备注
-     * @param bool $noRecordData 是否记录post数据
-     * @throws \yii\base\InvalidConfigException
-     */
-    public function log($behavior, $remark, $noRecordData = true)
-    {
-        ActionLog::record($behavior, $remark, $noRecordData);
     }
 
     /**
@@ -102,42 +84,35 @@ class Debris
     /**
      * 解析微信是否报错
      *
-     * @param $message
-     * @param bool $directError 是否直接报错
+     * @param array $message 微信回调数据
+     * @param bool $direct 是否直接报错
      * @return bool
-     * @throws \Exception
+     * @throws UnprocessableEntityHttpException
+     * @throws \EasyWeChat\Kernel\Exceptions\HttpException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \EasyWeChat\Kernel\Exceptions\RuntimeException
+     * @throws \Psr\SimpleCache\InvalidArgumentException
      */
-    public function analyWechatPortBack($message, $directError = true)
+    public function getWechatError($message, $direct = true)
     {
-        if (isset($message['errcode']))
+        if (isset($message['errcode']) && $message['errcode'] != 0)
         {
             // token过期 强制重新从微信服务器获取 token.
             if ($message['errcode'] == 40001)
             {
-                $app = Yii::$app->wechat->app;
-                $accessToken = $app->access_token;
-                $accessToken->getToken(true);
+                Yii::$app->wechat->app->access_token->getToken(true);
             }
 
-            if ($directError)
+            if ($direct)
             {
-                throw new \Exception($message['errmsg']);
+                throw new UnprocessableEntityHttpException($message['errmsg']);
             }
 
-            $this->_wechatError = $message['errmsg'];
+            return $message['errmsg'];
         }
 
-        return true;
-    }
-
-    /**
-     * 返回微信错误
-     *
-     * @return mixed
-     */
-    public function getWechatPortBackError()
-    {
-        return $this->_wechatError;
+        return false;
     }
 
     /**
@@ -155,6 +130,6 @@ class Debris
 
         $errors = array_values($firstErrors)[0];
 
-        return $errors ?? '操作失败';
+        return $errors ?? '未捕获到错误信息';
     }
 }

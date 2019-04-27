@@ -4,13 +4,16 @@ namespace backend\modules\member\controllers;
 use Yii;
 use yii\data\Pagination;
 use common\helpers\ResultDataHelper;
-use backend\modules\member\models\AddressForm;
+use common\enums\StatusEnum;
+use common\models\member\Address;
+use yii\helpers\ArrayHelper;
 
 /**
  * 收货地址
  *
- * Class AddressFormController
+ * Class AddressController
  * @package backend\modules\member\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class AddressController extends MController
 {
@@ -33,8 +36,10 @@ class AddressController extends MController
      */
     public function actionIndex()
     {
-        $data = AddressForm::find()->andWhere(['member_id' => $this->member_id]);
-        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->_pageSize]);
+        $data = Address::find()
+            ->where(['>=', 'status', StatusEnum::DISABLED])
+            ->andWhere(['member_id' => $this->member_id]);
+        $pages = new Pagination(['totalCount' => $data->count(), 'pageSize' => $this->pageSize]);
         $models = $data->offset($pages->offset)
             ->orderBy('id desc')
             ->limit($pages->limit)
@@ -48,7 +53,7 @@ class AddressController extends MController
     }
 
     /**
-     * 编辑/新增
+     * 编辑/创建
      *
      * @return mixed
      */
@@ -70,58 +75,51 @@ class AddressController extends MController
     }
 
     /**
-     * 删除
+     * 伪删除
      *
      * @param $id
      * @return mixed
-     * @throws \Throwable
-     * @throws yii\db\StaleObjectException
      */
-    public function actionDelete($id)
+    public function actionDestroy($id)
     {
-        if ($this->findModel($id)->delete())
+        if (!($model = Address::findOne($id)))
         {
-            return $this->message("删除成功", $this->redirect(['index', 'member_id' => $this->member_id]));
+            return $this->message("找不到数据", $this->redirect(['index']), 'error');
         }
 
-        return $this->message("删除失败", $this->redirect(['index', 'member_id' => $this->member_id]), 'error');
+        $model->status = StatusEnum::DELETE;
+        if ($model->save())
+        {
+            return $this->message("删除成功", $this->redirect(['index']));
+        }
+
+        return $this->message("删除失败", $this->redirect(['index']), 'error');
     }
 
     /**
      * 更新排序/状态字段
      *
+     * @param $id
      * @return array
      */
-    public function actionAjaxUpdate()
+    public function actionAjaxUpdate($id)
     {
-        $data = Yii::$app->request->get();
-        $insertData  = [];
-        foreach (['sort', 'status', 'id'] as $item)
+        if (!($model = Address::findOne($id)))
         {
-            if (isset($data[$item]))
-            {
-                $insertData[$item] = $data[$item];
-            }
+            return ResultDataHelper::json(404, '找不到数据');
         }
 
-        unset($data);
-
-        if (!($model = AddressForm::findOne($insertData['id'])))
-        {
-            return ResultDataHelper::result(404, '找不到数据');
-        }
-
-        $model->attributes = $insertData;
+        $model->attributes = ArrayHelper::filter(Yii::$app->request->get(), ['sort', 'status']);
         if (!$model->save())
         {
-            return ResultDataHelper::result(422, $this->analyErr($model->getFirstErrors()));
+            return ResultDataHelper::json(422, $this->analyErr($model->getFirstErrors()));
         }
 
-        return ResultDataHelper::result(200, '修改成功');
+        return ResultDataHelper::json(200, '修改成功');
     }
 
     /**
-     * 编辑/新增
+     * 编辑/创建
      *
      * @return array|mixed|string|yii\web\Response
      */
@@ -134,13 +132,13 @@ class AddressController extends MController
         {
             if ($request->isAjax)
             {
-                Yii::$app->response->format = yii\web\Response::FORMAT_JSON;
+                Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
                 return \yii\widgets\ActiveForm::validate($model);
             }
 
             return $model->save()
-                ? $this->redirect(['index', 'member_id' => $this->member_id])
-                : $this->message($this->analyErr($model->getFirstErrors()), $this->redirect(['index', 'member_id' => $this->member_id]), 'error');
+                ? $this->redirect(['index', 'member_id' => $model->member_id])
+                : $this->message($this->analyErr($model->getFirstErrors()), $this->redirect(['index', 'member_id' => $model->member_id]), 'error');
         }
 
         return $this->renderAjax($this->action->id, [
@@ -156,11 +154,12 @@ class AddressController extends MController
      */
     protected function findModel($id)
     {
-        if (empty($id) || empty(($model = AddressForm::findOne($id))))
+        if (empty($id) || empty(($model = Address::findOne($id))))
         {
-            $model = new AddressForm;
+            $model = new Address;
+            $model = $model->loadDefaultValues();
             $model->member_id = $this->member_id;
-            return $model->loadDefaultValues();
+            return $model;
         }
 
         return $model;

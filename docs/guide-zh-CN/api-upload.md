@@ -7,8 +7,6 @@
 - 语音上传
 - 文件上传
 - base64上传
-- 七牛上传
-- OSS上传
 
 ### 图片上传
 
@@ -20,10 +18,11 @@
 
 参数
 
-参数名 | 参数类型| 必填 | 默认 | 说明
----|---|---|---|---
-file | string| 是 | 无 | 文件
-thumb | array| 否 | 无 | 生成缩略图(具体看例子)
+参数名 | 参数类型| 必填 | 默认 | 说明 | 备注
+---|---|---|---|---|---
+file | string| 是 | 无 | 文件 | 
+drive | string| 否 | local | 本地上传 | oss:阿里云;qiniu:七牛
+thumb | array| 否 | 无 | 生成缩略图(具体看例子) | 
 
 thumb 数组例子(生成`100*100`和`200*200`的缩略图)
 
@@ -46,7 +45,7 @@ thumb 数组例子(生成`100*100`和`200*200`的缩略图)
     "code": 200,
     "message": "OK",
     "data": {
-        "urlPath": "1.jpg",
+        "url": "1.jpg",
     }
 }
 ```
@@ -61,9 +60,10 @@ thumb 数组例子(生成`100*100`和`200*200`的缩略图)
 
 参数
 
-参数名 | 参数类型| 必填 | 默认 | 说明
----|---|---|---|---
-file | string| 是 | 无 | 文件
+参数名 | 参数类型| 必填 | 默认 | 说明 | 备注
+---|---|---|---|---|---
+file | string| 是 | 无 | 文件 | 
+drive | string| 否 | local | 本地上传 | oss:阿里云;qiniu:七牛
 
 返回
 
@@ -72,7 +72,7 @@ file | string| 是 | 无 | 文件
     "code": 200,
     "message": "OK",
     "data": {
-        "urlPath": "1.mp4",
+        "url": "1.mp4",
     }
 }
 ```
@@ -87,9 +87,10 @@ file | string| 是 | 无 | 文件
 
 参数
 
-参数名 | 参数类型| 必填 | 默认 | 说明
----|---|---|---|---
-file | string| 是 | 无 | 文件
+参数名 | 参数类型| 必填 | 默认 | 说明 | 备注
+---|---|---|---|---|---
+file | string| 是 | 无 | 文件 | 
+drive | string| 否 | local | 本地上传 | oss:阿里云;qiniu:七牛
 
 返回
 
@@ -98,7 +99,7 @@ file | string| 是 | 无 | 文件
     "code": 200,
     "message": "OK",
     "data": {
-        "urlPath": "1.jpg",
+        "url": "1.jpg",
     }
 }
 ```
@@ -113,9 +114,10 @@ file | string| 是 | 无 | 文件
 
 参数
 
-参数名 | 参数类型| 必填 | 默认 | 说明
----|---|---|---|---
-file | string| 是 | 无 | 文件
+参数名 | 参数类型| 必填 | 默认 | 说明 | 备注
+---|---|---|---|---|---
+file | string| 是 | 无 | 文件 | 
+drive | string| 否 | local | 本地上传 | oss:阿里云;qiniu:七牛
 
 返回
 
@@ -124,7 +126,7 @@ file | string| 是 | 无 | 文件
     "code": 200,
     "message": "OK",
     "data": {
-        "urlPath": "1.jpg",
+        "url": "1.jpg",
     }
 }
 ```
@@ -134,15 +136,16 @@ file | string| 是 | 无 | 文件
 请求地址(Post)
 
 ```
-/v1/file/base64-img?access-token=[登陆获取到access-token]
+/v1/file/base64?access-token=[登陆获取到access-token]
 ```
 
 参数
 
-参数名 | 参数类型| 必填 | 默认 | 说明
----|---|---|---|---
-image | string| 是 | 无 | 文件
-extend | string| 否 | jpg | 文件后缀 
+参数名 | 参数类型| 必填 | 默认 | 说明 | 备注
+---|---|---|---|---|---
+image | string| 是 | 无 | 文件 | 
+drive | string| 否 | local | 本地上传 | oss:阿里云;qiniu:七牛
+extend | string| 否 | jpg | 文件后缀 | 
 
 返回
 
@@ -151,59 +154,7 @@ extend | string| 否 | jpg | 文件后缀
     "code": 200,
     "message": "OK",
     "data": {
-        "urlPath": "1.jpg",
-    }
-}
-```
-
-### 七牛上传
-
-请求地址(Post)
-
-```
-/v1/file/qiniu?access-token=[登陆获取到access-token]
-```
-
-参数
-
-参数名 | 参数类型| 必填 | 默认 | 说明
----|---|---|---|---
-file | string| 是 | 无 | 文件
-
-返回
-
-```
-{
-    "code": 200,
-    "message": "OK",
-    "data": {
-        "urlPath": "1.jpg",
-    }
-}
-```
-
-### OSS上传
-
-请求地址(Post)
-
-```
-/v1/file/oss?access-token=[登陆获取到access-token]
-```
-
-参数
-
-参数名 | 参数类型| 必填 | 默认 | 说明
----|---|---|---|---
-file | string| 是 | 无 | 文件
-
-返回
-
-```
-{
-    "code": 200,
-    "message": "OK",
-    "data": {
-        "urlPath": "1.jpg",
+        "url": "1.jpg",
     }
 }
 ```

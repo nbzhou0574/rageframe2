@@ -51,8 +51,8 @@ class ArticleCate extends \common\models\common\BaseModel
             'level' => '级别',
             'pid' => 'Pid',
             'status' => '状态',
-            'created_at' => 'Created At',
-            'updated_at' => 'Updated At',
+            'created_at' => '创建时间',
+            'updated_at' => '更新时间',
         ];
     }
 
@@ -81,5 +81,18 @@ class ArticleCate extends \common\models\common\BaseModel
         $cates = self::getTree();
 
         return ArrayHelper::map(ArrayHelper::itemsMergeDropDown($cates), 'id', 'title');
+    }
+
+    /**
+     * 删除全部子类
+     *
+     * @return bool
+     */
+    public function beforeDelete()
+    {
+        $ids = ArrayHelper::getChildIds(self::find()->all(), $this->id);
+        self::deleteAll(['in', 'id', $ids]);
+
+        return parent::beforeDelete();
     }
 }

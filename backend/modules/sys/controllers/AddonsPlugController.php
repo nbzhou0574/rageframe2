@@ -1,23 +1,28 @@
 <?php
 namespace backend\modules\sys\controllers;
 
+use common\models\sys\AddonsAuthItemChild;
 use Yii;
+use yii\helpers\ArrayHelper;
 use yii\helpers\Url;
 use yii\web\Response;
 use yii\widgets\ActiveForm;
+use common\helpers\AuthHelper;
 use common\helpers\ResultDataHelper;
 use common\helpers\FileHelper;
 use common\helpers\AddonHelper;
 use common\helpers\StringHelper;
 use common\models\sys\Addons;
 use common\models\sys\AddonsBinding;
+use common\models\sys\AddonsAuthItem;
 use backend\modules\sys\models\AddonsForm;
 
 /**
  * 模块插件控制器
- *
+ * s
  * Class AddonsPlugController
  * @package backend\modules\sys\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class AddonsPlugController extends SController
 {
@@ -39,6 +44,9 @@ class AddonsPlugController extends SController
             {
                 $model->delete();
             }
+
+            // 更新缓存
+            AuthHelper::updateCache();
 
             // 验证模块信息
             $class = AddonHelper::getAddonConfig($addonName);
@@ -74,11 +82,20 @@ class AddonsPlugController extends SController
             $item['upgradeUrl'] = Url::to(['upgrade', 'name' => $item['name']]);
             $item['ajaxEditUrl'] = Url::to(['ajax-edit', 'id' => $item['id']]);
             $item['uninstallUrl'] = Url::to(['uninstall', 'name' => $item['name']]);
+
+            // 权限校验显示
+            $item['auth'] = [
+                'upgradeConfig' => AuthHelper::verify('/sys/addons-plug/upgrade-config'),
+                'upgrade' => AuthHelper::verify('/sys/addons-plug/upgrade'),
+                'ajaxUpdate' => AuthHelper::verify('/sys/addons-plug/ajax-update'),
+                'ajaxEdit' => AuthHelper::verify('/sys/addons-plug/ajax-edit'),
+                'uninstal' => AuthHelper::verify('/sys/addons-plug/uninstal'),
+            ];
         }
 
         if ($request->isAjax)
         {
-            return ResultDataHelper::result(200, '查询成功',[
+            return ResultDataHelper::json(200, '查询成功',[
                 'list' => $list
             ]);
         }
@@ -125,6 +142,10 @@ class AddonsPlugController extends SController
                 // 添加入口
                 isset($addonsConfig->menu) && AddonsBinding::careteEntry($addonsConfig->menu, 'menu', $addonName);
                 isset($addonsConfig->cover) && AddonsBinding::careteEntry($addonsConfig->cover, 'cover', $addonName);
+
+                // 添加权限
+                AddonsAuthItem::add($addonsConfig, $addonName);
+
                 Addons::edit(new Addons(), $addonsConfig);
 
                 $transaction->commit();
@@ -143,38 +164,29 @@ class AddonsPlugController extends SController
     }
 
     /**
-     * ajax更新
+     * 更新排序/状态字段
      *
+     * @param $id
      * @return array
      */
-    public function actionAjaxUpdate()
+    public function actionAjaxUpdate($id)
     {
-        $data = Yii::$app->request->get();
-        $insertData = [];
-
-        foreach (['id', 'sort', 'status'] as $item)
+        if (!($model = Addons::findOne($id)))
         {
-            isset($data[$item]) && $insertData[$item] = $data[$item];
+            return ResultDataHelper::json(404, '找不到数据');
         }
 
-        unset($data);
-
-        if (!($model = Addons::findOne($insertData['id'])))
-        {
-            return ResultDataHelper::result(404, '找不到数据');
-        }
-
-        $model->attributes = $insertData;
+        $model->attributes = ArrayHelper::filter(Yii::$app->request->get(), ['sort', 'status']);
         if (!$model->save())
         {
-            return ResultDataHelper::result(422, $this->analyErr($model->getFirstErrors()));
+            return ResultDataHelper::json(422, $this->analyErr($model->getFirstErrors()));
         }
 
-        return ResultDataHelper::result(200, '修改成功');
+        return ResultDataHelper::json(200, '修改成功');
     }
 
     /**
-     * 编辑/新增
+     * 编辑/创建
      *
      * @return array|mixed|string|Response
      */
@@ -208,7 +220,7 @@ class AddonsPlugController extends SController
      */
     public function actionUpgrade()
     {
-        $request  = Yii::$app->request;
+        $request = Yii::$app->request;
         $addonName = $request->get('name');
         $class = AddonHelper::getAddonConfig($addonName);
         if (!class_exists($class))
@@ -247,10 +259,17 @@ class AddonsPlugController extends SController
             return $this->message('实例化失败,插件不存在或检查插件名称', $this->redirect(['uninstall']), 'error');
         }
 
-        // 更新
+        // 更新缓存
+        AuthHelper::updateCache();
+
+        // 更新配置
         $addonsConfig = new $class;
         isset($addonsConfig->menu) && AddonsBinding::careteEntry($addonsConfig->menu, 'menu', $addonName);
         isset($addonsConfig->cover) && AddonsBinding::careteEntry($addonsConfig->cover, 'cover', $addonName);
+
+        // 更新权限
+        AddonsAuthItem::add($addonsConfig, $addonName);
+
         Addons::edit($addon, $addonsConfig);
 
         return $this->message('更新配置成功', $this->redirect(['uninstall']));
@@ -309,10 +328,15 @@ class AddonsPlugController extends SController
             $files[] = "{$addonDir}wechat/views/default/";
             $files[] = "{$addonDir}wechat/views/default/index.php";
             $files[] = "{$addonDir}resources/";
-            $files[] = "{$addonDir}assets/";
-            $files[] = "{$addonDir}assets/BackendAsset.php";
-            $files[] = "{$addonDir}assets/FrontendAsset.php";
-            $files[] = "{$addonDir}assets/WechatAsset.php";
+            $files[] = "{$addonDir}resources/backend/";
+            $files[] = "{$addonDir}resources/frontend/";
+            $files[] = "{$addonDir}resources/wechat/";
+            $files[] = "{$addonDir}backend/assets/";
+            $files[] = "{$addonDir}backend/assets/Asset.php";
+            $files[] = "{$addonDir}frontend/assets/";
+            $files[] = "{$addonDir}frontend/assets/Asset.php";
+            $files[] = "{$addonDir}wechat/assets/";
+            $files[] = "{$addonDir}wechat/assets/Asset.php";
 
             // 小程序支持
             if($model->is_mini_program)
@@ -345,7 +369,9 @@ class AddonsPlugController extends SController
             file_put_contents("{$addonDir}common/models/DefaultModel.php", $this->renderPartial('template/DefaultModel',['model' => $model, 'appID' => 'backend']));
 
             // 资源目录
-            file_put_contents("{$addonDir}resources/.gitkeep", '*');
+            file_put_contents("{$addonDir}resources/backend/.gitkeep", '*');
+            file_put_contents("{$addonDir}resources/frontend/.gitkeep", '*');
+            file_put_contents("{$addonDir}resources/wechat/.gitkeep", '*');
 
             // 写入默认视图
             file_put_contents("{$addonDir}backend/views/default/index.php", $this->renderPartial('template/view/index',['model' => $model, 'appID' => 'backend']));
@@ -353,9 +379,9 @@ class AddonsPlugController extends SController
             file_put_contents("{$addonDir}wechat/views/default/index.php", $this->renderPartial('template/view/index',['model' => $model, 'appID' => 'wechat']));
 
             // 写入前台/后台/微信资源
-            file_put_contents("{$addonDir}assets/BackendAsset.php", $this->renderPartial('template/Asset',['model' => $model, 'appID' => 'Backend']));
-            file_put_contents("{$addonDir}assets/FrontendAsset.php", $this->renderPartial('template/Asset',['model' => $model, 'appID' => 'Frontend']));
-            file_put_contents("{$addonDir}assets/WechatAsset.php", $this->renderPartial('template/Asset',['model' => $model, 'appID' => 'Wechat']));
+            file_put_contents("{$addonDir}backend/assets/Asset.php", $this->renderPartial('template/Asset',['model' => $model, 'appID' => 'backend']));
+            file_put_contents("{$addonDir}frontend/assets/Asset.php", $this->renderPartial('template/Asset',['model' => $model, 'appID' => 'frontend']));
+            file_put_contents("{$addonDir}wechat/assets/Asset.php", $this->renderPartial('template/Asset',['model' => $model, 'appID' => 'wechat']));
 
             // 参数设置支持
             if($model->is_setting == true)
@@ -366,6 +392,7 @@ class AddonsPlugController extends SController
                 file_put_contents("{$addonDir}backend/views/setting/hook.php", $this->renderPartial('template/view/hook', ['model' => $model]));
                 file_put_contents("{$addonDir}backend/views/setting/display.php", $this->renderPartial('template/view/display', ['model' => $model]));
             }
+
             // 写入微信消息回复
             if($model->wechat_message == true)
             {

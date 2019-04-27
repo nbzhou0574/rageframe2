@@ -2,16 +2,17 @@
 namespace common\models\member;
 
 use Yii;
+use common\enums\StatusEnum;
 
 /**
  * This is the model class for table "{{%member_auth}}".
  *
- * @property int $id 主键
- * @property int $member_id 用户id
+ * @property string $id 主键
+ * @property string $member_id 用户id
  * @property string $unionid 唯一ID
- * @property string $type 授权组别
- * @property string $openid 授权id
- * @property int $sex 性别
+ * @property string $oauth_client 授权组别
+ * @property string $oauth_client_user_id 授权id
+ * @property int $gender 性别[0:未知;1:男;2:女]
  * @property string $nickname 昵称
  * @property string $head_portrait 头像
  * @property string $birthday 生日
@@ -19,8 +20,8 @@ use Yii;
  * @property string $province 省
  * @property string $city 市
  * @property int $status 状态(-1:已删除,0:禁用,1:正常)
- * @property int $created_at 创建时间
- * @property int $updated_at 修改时间
+ * @property string $created_at 创建时间
+ * @property string $updated_at 修改时间
  */
 class MemberAuth extends \common\models\common\BaseModel
 {
@@ -43,12 +44,14 @@ class MemberAuth extends \common\models\common\BaseModel
     public function rules()
     {
         return [
-            [['member_id', 'sex', 'status', 'created_at', 'updated_at'], 'integer'],
+            [['oauth_client', 'oauth_client_user_id'], 'required'],
+            [['member_id', 'gender', 'status', 'created_at', 'updated_at'], 'integer'],
             [['birthday'], 'safe'],
             [['unionid'], 'string', 'max' => 64],
             [['oauth_client'], 'string', 'max' => 20],
-            [['oauth_client_user_id', 'country', 'province', 'city'], 'string', 'max' => 100],
-            [['nickname', 'head_portrait'], 'string', 'max' => 200],
+            [['oauth_client_user_id', 'nickname', 'country', 'province', 'city'], 'string', 'max' => 100],
+            [['head_portrait'], 'string', 'max' => 150],
+            ['member_id', 'isBinding']
         ];
     }
 
@@ -60,10 +63,10 @@ class MemberAuth extends \common\models\common\BaseModel
         return [
             'id' => 'ID',
             'member_id' => '用户id',
-            'unionid' => 'Unionid',
+            'unionid' => '第三方用户唯一id',
             'oauth_client' => '类型',
-            'oauth_client_user_id' => 'Openid',
-            'sex' => '性别',
+            'oauth_client_user_id' => '第三方用户id',
+            'gender' => '性别',
             'nickname' => '昵称',
             'head_portrait' => '头像',
             'birthday' => '生日',
@@ -71,9 +74,30 @@ class MemberAuth extends \common\models\common\BaseModel
             'province' => '省',
             'city' => '市',
             'status' => '状态',
-            'created_at' => 'Created At',
-            'updated_at' => 'Updated At',
+            'created_at' => '创建时间',
+            'updated_at' => '更新时间',
         ];
+    }
+
+    /**
+     * 验证绑定
+     *
+     * @param $attribute
+     */
+    public function isBinding($attribute)
+    {
+        $model = self::find()
+            ->where([
+                'status' => StatusEnum::ENABLED,
+                'member_id' => $this->member_id,
+                'oauth_client_user_id' => $this->oauth_client_user_id,
+            ])
+            ->one();
+
+        if ($model && $model->id != $this->id)
+        {
+            $this->addError($attribute, '用户已绑定请不要重复绑定');
+        }
     }
 
     /**
@@ -93,23 +117,29 @@ class MemberAuth extends \common\models\common\BaseModel
      */
     public static function findOauthClientMapMember($oauthClient, $oauthClientUserId)
     {
-        return self::find()->where(['oauth_client' => $oauthClient, 'oauth_client_user_id' => $oauthClientUserId])->with('member')->one();
+        return self::find()
+            ->where(['oauth_client' => $oauthClient, 'oauth_client_user_id' => $oauthClientUserId])
+            ->with('member')
+            ->one();
     }
 
     /**
      * @param $data
-     * @return array|MemberAuth
+     * @return MemberAuth
+     * @throws \Exception
      */
     public function add($data)
     {
         $model = new self();
         $model->attributes = $data;
-        if ($model->save())
+
+        if (!$model->save())
         {
-            return $model;
+            $error = Yii::$app->debris->analyErr($model->getFirstErrors());
+            throw new \Exception($error);
         }
 
-        return $model->getFirstErrors();
+        return $model;
     }
 
     /**
@@ -119,6 +149,6 @@ class MemberAuth extends \common\models\common\BaseModel
      */
     public function getMember()
     {
-        return $this->hasOne(MemberInfo::className(), ['id' => 'member_id']);
+        return $this->hasOne(MemberInfo::class, ['id' => 'member_id']);
     }
 }

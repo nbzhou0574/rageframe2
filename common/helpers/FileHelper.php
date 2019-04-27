@@ -2,24 +2,25 @@
 namespace common\helpers;
 
 /**
- * 文件帮助类
+ * 文件辅助类
  *
  * Class FileHelper
  * @package common\helpers
+ * @author jianyan74 <751393839@qq.com>
  */
 class FileHelper
 {
     /**
      * 检测目录并循环创建目录
      *
-     * @param $path
+     * @param $catalogue
      */
-    public static function mkdirs($path)
+    public static function mkdirs($catalogue)
     {
-        if (!file_exists($path))
+        if (!file_exists($catalogue))
         {
-            self::mkdirs(dirname($path));
-            mkdir($path, 0777);
+            self::mkdirs(dirname($catalogue));
+            mkdir($catalogue, 0777);
         }
 
         return true;
@@ -34,7 +35,8 @@ class FileHelper
      */
      public static function writeLog($path, $content)
      {
-         return file_put_contents(self::mkdirs($path), "\r\n" . $content, FILE_APPEND);
+         self::mkdirs(dirname($path));
+         return file_put_contents($path, "\r\n" . $content, FILE_APPEND);
      }
 
     /**
@@ -49,7 +51,7 @@ class FileHelper
         $sizeResult = 0;
         while (false !== ($FolderOrFile = readdir($handle)))
         {
-            if($FolderOrFile != "." && $FolderOrFile != "..")
+            if ($FolderOrFile != "." && $FolderOrFile != "..")
             {
                 if (is_dir("$dir/$FolderOrFile"))
                 {
@@ -75,13 +77,13 @@ class FileHelper
     {
         foreach ($files as $key => $value)
         {
-            if(substr($value, -1) == '/')
+            if (substr($value, -1) == '/')
             {
-                @mkdir($value);
+                mkdir($value);
             }
             else
             {
-                @file_put_contents($value, '');
+                file_put_contents($value, '');
             }
         }
     }

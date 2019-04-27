@@ -1,5 +1,4 @@
 <?php
-
 namespace common\models\wechat;
 
 use Yii;
@@ -51,8 +50,8 @@ class FansStat extends \common\models\common\BaseModel
             'cumulate_attention' => '累计关注',
             'date' => '日期',
             'status' => 'Status',
-            'created_at' => 'Created At',
-            'updated_at' => 'Updated At',
+            'created_at' => '创建时间',
+            'updated_at' => '更新时间',
         ];
     }
 
@@ -203,7 +202,7 @@ class FansStat extends \common\models\common\BaseModel
     {
         return [
             [
-                'class' => TimestampBehavior::className(),
+                'class' => TimestampBehavior::class,
                 'attributes' => [
                     ActiveRecord::EVENT_BEFORE_INSERT => ['updated_at'],
                 ],

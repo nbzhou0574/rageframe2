@@ -9,12 +9,13 @@ use yii\helpers\Url;
     'enableAjaxValidation' => true,
     'validationUrl' => Url::toRoute(['ajax-edit', 'name' => $model['name']]),
     'fieldConfig' => [
-        'template' => "<div class='col-sm-2 text-right'>{label}</div><div class='col-sm-10'>{input}\n{hint}\n{error}</div>",
+        'template' => "<div class='col-sm-3 text-right'>{label}</div><div class='col-sm-9'>{input}\n{hint}\n{error}</div>",
     ]
 ]); ?>
 
 <div class="modal-header">
-    <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">×</span><span class="sr-only">关闭</span></button>
+    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+        <span aria-hidden="true">×</span></button>
     <h4 class="modal-title">基本信息</h4>
 </div>
 <div class="modal-body">

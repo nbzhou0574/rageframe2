@@ -10,6 +10,7 @@ use addons\RfExample\common\models\MongoDbCurd;
 /**
  * Class MongoDbCurdController
  * @package addons\RfExample\backend\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class MongoDbCurdController extends AddonsBaseController
 {
@@ -22,6 +23,7 @@ class MongoDbCurdController extends AddonsBaseController
      *
      * @param $id
      * @return MongoDbCurd|null
+     * @throws \Exception
      */
     protected function findModel($id)
     {

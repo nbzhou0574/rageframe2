@@ -1,18 +1,27 @@
 <?php
 namespace common\widgets\ueditor;
 
+
 use Yii;
+use yii\data\Pagination;
+use yii\helpers\Url;
 use yii\web\Controller;
 use yii\filters\AccessControl;
 use common\helpers\ArrayHelper;
 use common\helpers\UploadHelper;
-use Imagine\Imagick\Image;
+use common\helpers\StringHelper;
+use common\enums\StatusEnum;
+use common\models\common\Attachment;
+use common\models\wechat\Attachment as WechatAttachment;
+use League\Flysystem\Adapter\Local;
+use League\Flysystem\Filesystem;
 
 /**
- * 百度编辑器控制器
+ * 百度编辑器
  *
  * Class UeditorController
- * @package backend\controllers
+ * @package common\widgets\ueditor
+ * @author jianyan74 <751393839@qq.com>
  */
 class UeditorController extends Controller
 {
@@ -27,47 +36,47 @@ class UeditorController extends Controller
     public $config = [];
 
     /**
-     * 列出文件/图片时需要忽略的文件夹
-     * 主要用于处理缩略图管理，兼容比如elFinder之类的程序
+     * 显示驱动
+     *
+     * 有Attachment、WechatAttachment、Local
+     * @var string
+     */
+    public $showDrive = 'Attachment';
+
+    /**
      * @var array
      */
-    public $ignoreDir = [
-        '.thumbnails'
+    public $actions = [
+        'uploadimage' => 'image',
+        'uploadscrawl' => 'scrawl',
+        'uploadvideo' => 'video',
+        'uploadfile' => 'file',
+        'listimage' => 'list-image',
+        'listfile' => 'list-file',
+        'catchimage' => 'catch-image',
+        'config' => 'config',
+        'listinfo' => 'list-info',
     ];
 
     /**
-     * 缩略图设置
-     * 默认不开启
-     * ['height' => 200, 'width' => 200]表示生成200*200的缩略图，如果设置为空数组则不生成缩略图
-     * @var array
+     * @var int
      */
-    public $thumbnail = [];
+    protected $fileStart;
 
     /**
-     * 图片缩放设置
-     * 默认不缩放。
-     * 配置如 ['height'=>200,'width'=>200]
-     * @var array
+     * @var int
      */
-    public $zoom = [];
+    protected $fileEnd;
 
     /**
-     * 水印设置
-     * 参考配置如下：
-     * ['path'=>'水印图片位置','position'=>0]
-     * 默认位置为 9，可不配置
-     * position in [1 ,9]，表示从左上到右下的9个位置。
-     * @var array
+     * @var int
      */
-    public $watermark = [];
+    protected $fileNum = 0;
 
     /**
-     * 是否允许内网采集
-     * 如果为 false 则远程图片获取不获取内网图片，防止 SSRF。
-     * 默认为 false
-     * @var bool
+     * @var \League\Flysystem\Adapter\Local
      */
-    public $allowIntranet = false;
+    protected $filesystem;
 
     /**
      * 行为控制
@@ -76,7 +85,7 @@ class UeditorController extends Controller
     {
         return [
             'access' => [
-                'class' => AccessControl::className(),
+                'class' => AccessControl::class,
                 'rules' => [
                     [
                         'allow' => true,
@@ -102,6 +111,10 @@ class UeditorController extends Controller
             'fileMaxSize' => Yii::$app->params['uploadConfig']['files']['maxSize'],
             'imageManagerListPath' => Yii::$app->params['uploadConfig']['images']['path'],
             'fileManagerListPath' => Yii::$app->params['uploadConfig']['files']['path'],
+            'scrawlFieldName' => 'image',
+            'videoFieldName' => 'file',
+            'fileFieldName' => 'file',
+            'imageFieldName' => 'file',
         ];
 
         $configPath = Yii::getAlias('@common') . "/widgets/ueditor/";
@@ -112,9 +125,11 @@ class UeditorController extends Controller
             $this->config = ArrayHelper::merge($config, $this->config);
         }
 
-        if (!is_array($this->thumbnail))
+        // 设置显示驱动
+        $showDrive = Yii::$app->request->get('showDrive');
+        if(!empty($showDrive) && in_array($showDrive, ['Attachment', 'WechatAttachment', 'Local']))
         {
-            $this->thumbnail = false;
+            $this->showDrive = $showDrive;
         }
     }
 
@@ -125,29 +140,16 @@ class UeditorController extends Controller
      */
     public function actionIndex()
     {
-        Yii::$app->response->format = yii\web\Response::FORMAT_JSON;
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
 
         $action = strtolower(Yii::$app->request->get('action', 'config'));
-        $actions = [
-            'uploadimage' => 'image',
-            'uploadscrawl' => 'scrawl',
-            'uploadvideo' => 'video',
-            'uploadfile' => 'file',
-            'listimage' => 'list-image',
-            'listfile' => 'list-file',
-            'catchimage' => 'catch-image',
-            'config' => 'config',
-            'listinfo' => 'list-info'
-        ];
-
+        $actions = $this->actions;
         if (isset($actions[$action]))
         {
             return $this->run($actions[$action]);
         }
 
-        return [
-            'state' => '找不到方法'
-        ];
+        return $this->result('找不到方法');
     }
 
     /**
@@ -167,12 +169,16 @@ class UeditorController extends Controller
     {
         try
         {
-            $result = UploadHelper::upload('upfile', 'images');
-            return $this->result('SUCCESS', $result['relativePath'] . $result['name']);
+            $upload = new UploadHelper(Yii::$app->request->get(), 'images');
+            $upload->verifyFile();
+            $upload->save();
+
+            $baseInfo = $upload->getBaseInfo();
+            return $this->result('SUCCESS', $baseInfo['url']);
         }
         catch (\Exception $e)
         {
-            return $this->result();
+            return $this->result($e->getMessage());
         }
     }
 
@@ -185,12 +191,20 @@ class UeditorController extends Controller
     {
         try
         {
-            $resUpload = UploadHelper::Base64Img(Yii::$app->request->post('upfile'));
-            return $this->result('SUCCESS', $resUpload['urlPath']);
+            // 保存扩展名称
+            $extend = Yii::$app->request->post('extend', 'jpg');
+            $data = Yii::$app->request->post('image');
+
+            $upload = new UploadHelper(Yii::$app->request->post(), 'images');
+            $upload->verifyBase64($data, $extend);
+            $upload->save(base64_decode($data));
+
+            $baseInfo = $upload->getBaseInfo();
+            return $this->result('SUCCESS', $baseInfo['url']);
         }
         catch (\Exception $e)
         {
-            return $this->result();
+            return $this->result($e->getMessage());
         }
     }
 
@@ -203,12 +217,16 @@ class UeditorController extends Controller
     {
         try
         {
-            $result = UploadHelper::upload('upfile', 'videos');
-            return $this->result('SUCCESS', $result['relativePath'] . $result['name']);
+            $upload = new UploadHelper(Yii::$app->request->get(), 'videos');
+            $upload->verifyFile();
+            $upload->save();
+
+            $baseInfo = $upload->getBaseInfo();
+            return $this->result('SUCCESS', $baseInfo['url']);
         }
         catch (\Exception $e)
         {
-            return $this->result();
+            return $this->result($e->getMessage());
         }
     }
 
@@ -219,48 +237,54 @@ class UeditorController extends Controller
     {
         try
         {
-            $result = UploadHelper::upload('upfile', 'files');
-            return $this->result('SUCCESS', $result['relativePath'] . $result['name']);
+            $upload = new UploadHelper(Yii::$app->request->get(), 'files');
+            $upload->verifyFile();
+            $upload->save();
+
+            $baseInfo = $upload->getBaseInfo();
+            return $this->result('SUCCESS', $baseInfo['url']);
         }
         catch (\Exception $e)
         {
-            return $this->result();
+            return $this->result($e->getMessage());
         }
     }
 
     /**
      * 获取远程图片
+     *
+     * @return array
+     * @throws \Exception
      */
     public function actionCatchImage()
     {
         /* 上传配置 */
-        $config = [
-            'pathFormat' => $this->config['catcherPathFormat'],
-            'maxSize' => $this->config['catcherMaxSize'],
-            'allowFiles' => $this->config['catcherAllowFiles'],
-            'oriName' => 'remote.png'
-        ];
+        $source = Yii::$app->request->post('source', []);
 
-        $fieldName = $this->config['catcherFieldName'];
-        /* 抓取远程图片 */
-        $list = [];
-        if (isset($_POST[$fieldName])) {
-            $source = $_POST[$fieldName];
-        } else {
-            $source = $_GET[$fieldName];
+        $upload = new UploadHelper(Yii::$app->request->get(), 'images');
+
+        foreach ($source as $imgUrl)
+        {
+            try
+            {
+                $upload->save($upload->verifyUrl($imgUrl));
+                $baseInfo = $upload->getBaseInfo();
+                $list[] = [
+                    'state' => 'SUCCESS',
+                    'url' => $baseInfo['url'],
+                    'source' => $imgUrl
+                ];
+            }
+            catch (\Exception $e)
+            {
+                $list[] = [
+                    'state' => $e->getMessage(),
+                    'url' => '',
+                    'source' => $imgUrl
+                ];
+            }
         }
-        foreach ($source as $imgUrl) {
-            $item = new Uploader($imgUrl, $config, 'remote');
-            if ($this->allowIntranet)
-                $item->setAllowIntranet(true);
-            $info = $item->getFileInfo();
-            $info['thumbnail'] = $this->imageHandle($info['url']);
-            $list[] = [
-                'state' => $info['state'],
-                'url' => $info['url'],
-                'source' => $imgUrl
-            ];
-        }
+
         /* 返回抓取数据 */
         return [
             'state' => count($list) ? 'SUCCESS' : 'ERROR',
@@ -275,7 +299,13 @@ class UeditorController extends Controller
      */
     public function actionListFile()
     {
-        return $this->manage($this->config['fileManagerAllowFiles'], $this->config['fileManagerListSize'], $this->config['fileManagerListPath']);
+        $prefix = Yii::$app->params['uploadConfig']['files']['fullPath'] == true ? Yii::$app->request->hostInfo : '';
+        $action = 'get' . $this->showDrive;
+        return $this->$action(
+            $this->config['fileManagerListSize'],
+            $this->config['fileManagerListPath'],
+            $prefix
+        );
     }
 
     /**
@@ -285,7 +315,90 @@ class UeditorController extends Controller
      */
     public function actionListImage()
     {
-        return $this->manage($this->config['imageManagerAllowFiles'], $this->config['imageManagerListSize'], $this->config['imageManagerListPath']);
+        $prefix = Yii::$app->params['uploadConfig']['images']['fullPath'] == true ? Yii::$app->request->hostInfo : '';
+        $action = 'get' . $this->showDrive;
+        return $this->$action(
+            $this->config['imageManagerListSize'],
+            $this->config['imageManagerListPath'],
+            $prefix
+        );
+    }
+
+    /**
+     * 获取微信资源
+     *
+     * @param $size
+     * @param $path
+     * @return array
+     */
+    public function getWechatAttachment($size, $path)
+    {
+        $start = Yii::$app->request->get('start');
+
+        $data = WechatAttachment::find()
+            ->where(['status' => StatusEnum::ENABLED])
+            ->andWhere(['media_type' => 'image'])
+            ->orderBy('id desc');
+        $countModel = clone $data;
+        $models = $data->offset($start)
+            ->limit($size)
+            ->asArray()
+            ->all();
+
+        $files = [];
+        foreach ($models as $model)
+        {
+            $files[] = [
+                'url' => urldecode(Url::to(['/wechat/analysis/image', 'attach' => $model['media_url']])),
+                'mtime' => $model['created_at']
+            ];
+        }
+
+        return [
+            'state' => 'SUCCESS',
+            'list' => $files,
+            'start' => $start,
+            'total' => $countModel->count(),
+        ];
+    }
+
+    /**
+     * 获取数据库资源文件列表
+     *
+     * @param $path
+     * @param $size
+     * @return array
+     */
+    public function getAttachment($size, $path)
+    {
+        $start = Yii::$app->request->get('start');
+        $upload_type = $path == $this->config['imageManagerListPath'] ? 'images' : 'files';
+
+        $data = Attachment::find()
+            ->where(['status' => StatusEnum::ENABLED])
+            ->andWhere(['upload_type' => $upload_type])
+            ->orderBy('id desc');
+        $countModel = clone $data;
+        $models = $data->offset($start)
+            ->limit($size)
+            ->asArray()
+            ->all();
+
+        $files = [];
+        foreach ($models as $model)
+        {
+            $files[] = [
+                'url' => $model['base_url'],
+                'mtime' => $model['created_at']
+            ];
+        }
+
+        return [
+            'state' => 'SUCCESS',
+            'list' => $files,
+            'start' => $start,
+            'total' => $countModel->count(),
+        ];
     }
 
     /**
@@ -296,93 +409,60 @@ class UeditorController extends Controller
      * @param $path
      * @return array
      */
-    protected function manage($allowFiles, $listSize, $path)
+    protected function getLocal($listSize, $path, $prefix)
     {
-        $allowFiles = substr(str_replace('.', '|', join('', $allowFiles)), 1);
         /* 获取参数 */
-        $size = isset($_GET['size']) ? $_GET['size'] : $listSize;
-        $start = isset($_GET['start']) ? $_GET['start'] : 0;
-        $end = $start + $size;
+        $size = Yii::$app->request->get('size', $listSize);
+        $this->fileStart = Yii::$app->request->get('start', 0);
+        $this->fileEnd = $this->fileStart + $size;
 
-        /* 获取文件列表 */
-        $path = Yii::getAlias('@attachment') . (substr($path, 0, 1) == '/' ? '' : '/') . $path;
-
-        $files = $this->getFiles($path, $allowFiles);
-        if (!count($files))
-        {
-            return  [
-                'state' => 'no match file',
-                'list' => [],
-                'start' => $start,
-                'total' => count($files),
-            ];
-        }
-
-        /* 获取指定范围的列表 */
-        $len = count($files);
-        for ($i = min($end, $len) - 1, $list = []; $i < $len && $i >= 0 && $i >= $start; $i--)
-        {
-            $list[] = $files[$i];
-        }
-
-        /* 返回数据 */
-        return [
+        $files = $this->getLocalFiles($path, $prefix);
+        return  [
             'state' => 'SUCCESS',
-            'list' => $list,
-            'start' => $start,
-            'total' => count($files),
+            'list' => $files,
+            'start' => $this->fileStart,
+            'total' => $this->fileNum,
         ];
     }
 
     /**
-     * 遍历获取目录下的指定类型的文件
-     * @param $path
-     * @param $allowFiles
-     * @param array $files
-     * @return array|null
+     * @param string $path 文件路径
+     * @param string $allowFiles 文件后缀
+     * @param array $files 文件列表
+     * @param string $prefix 前缀
+     * @return array
      */
-    protected function getFiles($path, $allowFiles, &$files = [])
+    public function getLocalFiles($path, $prefix, &$files = [])
     {
-        if (!is_dir($path) || in_array(basename($path), $this->ignoreDir))
+        if (!$this->filesystem)
         {
-            return null;
+            $adapter = new Local(Yii::getAlias('@attachment'));
+            $this->filesystem = new Filesystem($adapter);
         }
 
-        if (substr($path, strlen($path) - 1) != '/')
+        $listFiles = $this->filesystem->listContents($path);
+        foreach ($listFiles as $key => $listFile)
         {
-            $path .= '/';
-        }
-
-        $handle = opendir($path);
-        while (false !== ($file = readdir($handle)))
-        {
-            if ($file != '.' && $file != '..')
+            if ($listFile['type'] == 'dir')
             {
-                $childPath = $path . $file;
-                if (is_dir($childPath))
-                {
-                    $this->getFiles($childPath, $allowFiles, $files);
-                }
-                else
-                {
-                    // 正则匹配文件后缀待优化
-                    $pat = "/\.(" . $allowFiles . ")$/i";
-                    if ($this->action->id == 'list-image')
-                    {
-                        $pat = "/\.thumbnail\.(" . $allowFiles . ")$/i";
-                    }
-
-                    $files[] = [
-                        'url' => Yii::getAlias('@attachurl') . substr($childPath, strlen(Yii::getAlias('@attachment'))),
-                        'mtime' => filemtime($childPath)
-                    ];
-
-//                    if (preg_match($pat, $file))
-//                    {
-//
-//                    }
-                }
+                $this->getLocalFiles($listFile['path'], $prefix, $files);
             }
+            else
+            {
+                // 获取选中列表
+                if ($this->fileNum >= $this->fileStart && $this->fileNum < $this->fileEnd)
+                {
+                    $url = $prefix . Yii::getAlias('@attachurl') . '/' . $listFile['path'];
+                    $files[] = [
+                        'url' => $url,
+                        'mtime' => $listFile['timestamp']
+                    ];
+                }
+
+                $this->fileNum++;
+            }
+
+            unset($listFiles[$key]);
         }
 
         return $files;
@@ -398,138 +478,5 @@ class UeditorController extends Controller
             "state" => $state,
             "url" => $url,
         ];
-    }
-
-    /**
-     * 自动处理图片
-     *
-     * @param $file
-     * @return string
-     */
-    protected function imageHandle($file)
-    {
-        if (substr($file, 0, 1) != '/')
-        {
-            $file = '/' . $file;
-        }
-
-        //先处理缩略图
-        if ($this->thumbnail && !empty($this->thumbnail['height']) && !empty($this->thumbnail['width']))
-        {
-            $file_path = pathinfo($file);
-            $thumbnailFile = $file_path['dirname'] . '/' . $file_path['filename'] . '.thumbnail.' . $file_path['extension'];
-            Image::thumbnail($this->webroot . $file, intval($this->thumbnail['width']), intval($this->thumbnail['height']))
-                ->save($this->webroot . $thumbnailFile);
-        }
-        //再处理缩放，默认不缩放
-        //...缩放效果非常差劲-，-
-        if (isset($this->zoom['height']) && isset($this->zoom['width']))
-        {
-            $size = $this->getSize($this->webroot . $file);
-            if ($size && $size[0] > 0 && $size[1] > 0) {
-                $ratio = min([$this->zoom['height'] / $size[0], $this->zoom['width'] / $size[1], 1]);
-                Image::thumbnail($this->webroot . $file, ceil($size[0] * $ratio), ceil($size[1] * $ratio))
-                    ->save($this->webroot . $file);
-            }
-        }
-
-        //最后生成水印
-        if (isset($this->watermark['path']) && file_exists($this->watermark['path']))
-        {
-            if (!isset($this->watermark['position']) or $this->watermark['position'] > 9 or $this->watermark['position'] < 0 or !is_numeric($this->watermark['position']))
-                $this->watermark['position'] = 9;
-            $size = $this->getSize($this->webroot . $file);
-            $waterSize = $this->getSize($this->watermark['path']);
-            if ($size[0] > $waterSize[0] and $size[1] > $waterSize[1])
-            {
-                $halfX = $size[0] / 2;
-                $halfY = $size[1] / 2;
-                $halfWaterX = $waterSize[0] / 2;
-                $halfWaterY = $waterSize[1] / 2;
-                switch (intval($this->watermark['position']))
-                {
-                    case 1:
-                        $x = 0;
-                        $y = 0;
-                        break;
-                    case 2:
-                        $x = $halfX - $halfWaterX;
-                        $y = 0;
-                        break;
-                    case 3:
-                        $x = $size[0] - $waterSize[0];
-                        $y = 0;
-                        break;
-                    case 4:
-                        $x = 0;
-                        $y = $halfY - $halfWaterY;
-                        break;
-                    case 5:
-                        $x = $halfX - $halfWaterX;
-                        $y = $halfY - $halfWaterY;
-                        break;
-                    case 6:
-                        $x = $size[0] - $waterSize[0];
-                        $y = $halfY - $halfWaterY;
-                        break;
-                    case 7:
-                        $x = 0;
-                        $y = $size[1] - $waterSize[1];
-                        break;
-                    case 8:
-                        $x = $halfX - $halfWaterX;
-                        $y = $size[1] - $waterSize[1];
-                        break;
-                    case 9:
-                    default:
-                        $x = $size[0] - $waterSize[0];
-                        $y = $size[1] - $waterSize[1];
-                }
-
-                Image::watermark($this->webroot . $file, $this->watermark['path'], [$x, $y])
-                    ->save($this->webroot . $file);
-            }
-        }
-
-        return $file;
-    }
-
-    /**
-     * 获取图片的大小
-     * 主要用于获取图片大小并
-     * @param $file
-     * @return array
-     */
-    protected function getSize($file)
-    {
-        if (!file_exists($file))
-        {
-            return [];
-        }
-
-        $info = pathinfo($file);
-        $image = null;
-        switch (strtolower($info['extension']))
-        {
-            case 'gif':
-                $image = imagecreatefromgif($file);
-                break;
-            case 'jpg':
-            case 'jpeg':
-                $image = imagecreatefromjpeg($file);
-                break;
-            case 'png':
-                $image = imagecreatefrompng($file);
-                break;
-            default:
-                break;
-        }
-
-        if ($image == null)
-        {
-            return [];
-        }
-
-        return [imagesx($image), imagesy($image)];
     }
 }

@@ -1,5 +1,4 @@
 <?php
-
 namespace common\models\sys;
 
 use Yii;
@@ -13,6 +12,7 @@ use Yii;
  * @property string $description
  * @property string $rule_name 规则名称
  * @property string $data
+ * @property string $position
  * @property int $parent_key 父级key
  * @property int $level 级别
  * @property int $sort 排序
@@ -38,6 +38,11 @@ class AuthItem extends \common\models\common\BaseModel
     const AUTH = 2;
 
     /**
+     * 树前缀
+     */
+    const POSITION_PREFIX = 'tr_';
+
+    /**
      * {@inheritdoc}
      */
     public static function tableName()
@@ -52,15 +57,36 @@ class AuthItem extends \common\models\common\BaseModel
     {
         return [
             [['type'], 'required'],
+            [['description'], 'required'],
             [['name'], 'required', 'message' => '内容不能为空'],
             [['type', 'level', 'sort', 'created_at', 'updated_at'], 'integer'],
             [['key','parent_key'], 'safe'],
             [['description', 'data'], 'string'],
             [['name', 'rule_name'], 'string', 'max' => 64],
+            [['position'], 'string', 'max' => 2000],
             ['name', 'unique', 'message' => '名称已存在,请重新输入'],
             ['parent_key', 'default', 'value' => 0],
-            [['rule_name'], 'exist', 'skipOnError' => true, 'targetClass' => AuthRule::className(), 'targetAttribute' => ['rule_name' => 'name']],
+            [['rule_name'], 'exist', 'skipOnError' => true, 'targetClass' => AuthRule::class, 'targetAttribute' => ['rule_name' => 'name']],
         ];
+    }
+
+    /**
+     * 获取子角色
+     *
+     * @param AuthItem $model
+     * @return array|\yii\db\ActiveRecord[]
+     */
+    public static function getChilds(AuthItem $model)
+    {
+        $position = $model->position . ' ' . static::POSITION_PREFIX . $model->key;
+
+        $models = self::find()
+            ->where(['type' => AuthItem::ROLE])
+            ->andWhere(['like', 'position', $position . '%', false])
+            ->asArray()
+            ->all();
+
+        return $models ?? [];
     }
 
     /**
@@ -76,27 +102,32 @@ class AuthItem extends \common\models\common\BaseModel
             'rule_name' => '规则',
             'data' => 'Data',
             'parent_key' => 'Parent Key',
+            'position' => '树',
             'level' => '级别',
             'sort' => '排序',
-            'created_at' => 'Created At',
-            'updated_at' => 'Updated At',
+            'created_at' => '创建时间',
+            'updated_at' => '更新时间',
         ];
     }
 
     /**
+     * 关联角色
+     *
      * @return \yii\db\ActiveQuery
      */
     public function getAuthAssignments()
     {
-        return $this->hasMany(AuthAssignment::className(), ['item_name' => 'name']);
+        return $this->hasMany(AuthAssignment::class, ['item_name' => 'name']);
     }
 
     /**
+     * 关联路由名称
+     *
      * @return \yii\db\ActiveQuery
      */
     public function getRuleName()
     {
-        return $this->hasOne(AuthRule::className(), ['name' => 'rule_name']);
+        return $this->hasOne(AuthRule::class, ['name' => 'rule_name']);
     }
 
     /**
@@ -104,7 +135,7 @@ class AuthItem extends \common\models\common\BaseModel
      */
     public function getAuthItemChildren()
     {
-        return $this->hasMany(AuthItemChild::className(), ['parent' => 'name']);
+        return $this->hasMany(AuthItemChild::class, ['parent' => 'name']);
     }
 
     /**
@@ -112,7 +143,7 @@ class AuthItem extends \common\models\common\BaseModel
      */
     public function getAuthItemChildren0()
     {
-        return $this->hasMany(AuthItemChild::className(), ['child' => 'name']);
+        return $this->hasMany(AuthItemChild::class, ['child' => 'name']);
     }
 
     /**
@@ -120,7 +151,8 @@ class AuthItem extends \common\models\common\BaseModel
      */
     public function getChildren()
     {
-        return $this->hasMany(AuthItem::className(), ['name' => 'child'])->viaTable('{{%sys_auth_item_child}}', ['parent' => 'name']);
+        return $this->hasMany(AuthItem::class, ['name' => 'child'])
+            ->viaTable('{{%sys_auth_item_child}}', ['parent' => 'name']);
     }
 
     /**
@@ -128,7 +160,21 @@ class AuthItem extends \common\models\common\BaseModel
      */
     public function getParents()
     {
-        return $this->hasMany(AuthItem::className(), ['name' => 'parent'])->viaTable('{{%sys_auth_item_child}}', ['child' => 'name']);
+        return $this->hasMany(AuthItem::class, ['name' => 'parent'])
+            ->viaTable('{{%sys_auth_item_child}}', ['child' => 'name']);
+    }
+
+    /**
+     * 删除子权限
+     *
+     * @return bool
+     */
+    public function beforeDelete()
+    {
+        $position = $this->position . ' ' . self::POSITION_PREFIX . $this->key;
+        self::deleteAll(['like', 'position', $position . '%', false]);
+
+        return parent::beforeDelete();
     }
 
     /**
@@ -147,8 +193,34 @@ class AuthItem extends \common\models\common\BaseModel
 
             $key = $model['key'];
             $this->key = $key ? $key + 1 : 1;
+
+            if ($this->parent_key > 0)
+            {
+                if (!($parent = self::find()->where(['key' => $this->parent_key])->one()))
+                {
+                    return $this->addError('name', '找不到上级');
+                }
+
+                $this->level = $parent->level + 1;
+                $this->position = $parent->position . ' ' . static::POSITION_PREFIX . $parent->key;
+            }
+            else
+            {
+                if ($this->type == self::AUTH || Yii::$app->services->sys->isAuperAdmin())
+                {
+                    $this->position = static::POSITION_PREFIX . '0';
+                }
+                else
+                {
+                    $role = Yii::$app->services->sys->auth->getRole();
+                    $this->parent_key = $role->key;
+                    $this->level = $role->level + 1;
+                    $this->position = $role->position . ' ' . static::POSITION_PREFIX . $role->key;
+                }
+            }
         }
 
+        // 设置rule_name为null否则报错
         if (empty($this->rule_name))
         {
             $this->rule_name = null;

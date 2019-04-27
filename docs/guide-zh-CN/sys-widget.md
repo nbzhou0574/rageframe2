@@ -6,13 +6,13 @@
 - 日期控件
 - 时间控件
 - 日期时间控件
-- 日期范围选择控件
 - 日期区间控件
 - 图片上传控件
 - 多图上传控件
 - 文件上传控件
 - 多文件上传控件
 - 多Input框控件
+- Select2
 - 省市区控件
 - 百度编辑器
 
@@ -22,7 +22,7 @@
 use kartik\color\ColorInput;
 ```
 ```
-<?= $form->field($model, 'color')->widget(ColorInput::classname(), [
+<?= $form->field($model, 'color')->widget(ColorInput::class, [
     'options' => ['placeholder' => '请选择颜色'],
 ]);?>
 ```
@@ -60,22 +60,20 @@ use kartik\color\ColorInput;
 ### 日期时间控件
 
 ```
-use dosamigos\datetimepicker\DateTimePicker;
+use kartik\datetime\DateTimePicker;
 ```
 ```
-<?= $form->field($model, 'test')->widget(DateTimePicker::className(), [
-    'language' => 'zh-CN',
-    'template' => '{button}{reset}{input}',
-    'options' => [
-        'value' => $model->isNewRecord ? '' : date('Y-m-d H:i:s',$model->test),
-    ],
-    'clientOptions' => [
-        'format' => 'yyyy-mm-dd hh:ii:ss',
-        'todayHighlight' => true,//今日高亮
-        'autoclose' => true,//选择后自动关闭
-        'todayBtn' => true,//今日按钮显示
-    ]
-
+<?= $form->field($model, 'test')->widget(DateTimePicker::class, [
+        'language' => 'zh-CN',
+        'options' => [
+            'value' => $model->isNewRecord ? date('Y-m-d H:i:s') : date('Y-m-d H:i:s',$model->start_time),
+        ],
+        'pluginOptions' => [
+            'format' => 'yyyy-mm-dd hh:ii',
+            'todayHighlight' => true,//今日高亮
+            'autoclose' => true,//选择后自动关闭
+            'todayBtn' => true,//今日按钮显示
+        ]
 ]);?>
 ```
 
@@ -84,27 +82,43 @@ use dosamigos\datetimepicker\DateTimePicker;
 ```
 use kartik\daterange\DateRangePicker;
 ```
+
 ```
-<?= $form->field($model, 'date_range', [
-        'addon'=>['prepend'=>['content'=>'<i class="glyphicon glyphicon-calendar"></i>']],
-        'options'=>['class'=>'drp-container form-group']
-    ])->widget(DateRangePicker::classname(), [
-        'useWithAddon'=>true
-    ]);?>
+$addon = <<< HTML
+<span class="input-group-addon">
+    <i class="glyphicon glyphicon-calendar"></i>
+</span>
+HTML;
+```
+
+```
+<?= DateRangePicker::widget([
+    'name' => 'queryDate',
+    'value' => date('Y-m-d') . '-' . date('Y-m-d'),
+    'readonly' => 'readonly',
+    'useWithAddon' => true,
+    'convertFormat' => true,
+    'startAttribute' => 'from_date',
+    'endAttribute' => 'to_date',
+    'startInputOptions' => ['value' => date('Y-m-d')],
+    'endInputOptions' => ['value' => date('Y-m-d')],
+    'pluginOptions' => [
+        'locale' => ['format' => 'Y-m-d'],
+    ]
+]) . $addon;?>
 ```
 
 具体参考：http://demos.krajee.com/date-range
 
 ### 图片上传控件
 
-> 注意OSS/七牛暂不支持切片和缩略图操作
+> 注意OSS/七牛暂不支持切片和缩略图操作，以下是完整案例
 
 ```
 <?= $form->field($model, 'cover')->widget('common\widgets\webuploader\Images', [
      'config' => [
           // 可设置自己的上传地址, 不设置则默认地址
-          // 'server' => Url::to(['/file/qiniu']),//七牛上传 (二选一)
-          // 'server' => Url::to(['/file/ali-oss']),//阿里云Oss上传
+          // 'server' => '',
          'pick' => [
              'multiple' => false,
          ],
@@ -119,7 +133,8 @@ use kartik\daterange\DateRangePicker;
                     'widget' => 200,
                     'height' => 200,
                 ],
-            ]
+            ],
+            'drive' => 'local',// 默认本地 支持 qiniu/oss 上传
         ],
          'chunked' => false,// 开启分片上传
          'chunkSize' => 512 * 1024,// 分片大小
@@ -132,13 +147,14 @@ config 更多参考 http://fex.baidu.com/webuploader/doc/
 
 ### 多图上传控件
 
-注意传入的value值为数组
+> 注意传入的value值为数组,例如: array('img1.jpg', 'img2.jpg')
 
 ```
 <?= $form->field($model, 'covers')->widget('common\widgets\webuploader\Images', [
      'config' => [ // 配置同图片上传
+         // 'server' => '',
          'pick' => [
-             'multiple' => ture,
+             'multiple' => true,
          ],
          'formData' => [
              // 不配置则不生成缩略图
@@ -162,6 +178,7 @@ config 更多参考 http://fex.baidu.com/webuploader/doc/
 ```
 <?= $form->field($model, 'file')->widget('common\widgets\webuploader\Files', [
      'config' => [ // 配置同图片上传
+         // 'server' => \yii\helpers\Url::to(['file/files']), // 默认files 支持videos/voices/images方法验证
          'pick' => [
              'multiple' => false,
          ]
@@ -171,13 +188,15 @@ config 更多参考 http://fex.baidu.com/webuploader/doc/
 
 ### 多文件上传控件
 
-> 注意多文件上传不支持缩略图配置
+> 注意多文件上传不支持缩略图配置  
+> 注意传入的value值为数组,例如: array('img1.jpg', 'img2.jpg')
 
 ```
 <?= $form->field($model, 'files')->widget('common\widgets\webuploader\Files', [
      'config' => [ // 配置同图片上传
+          // 'server' => '',
          'pick' => [
-             'multiple' => ture,
+             'multiple' => true,
          ]
      ]
 ]);?>
@@ -190,7 +209,7 @@ use unclead\multipleinput\MultipleInput;
 
 ...
 
-<?= $form->field($model, 'schedule')->widget(MultipleInput::className(), [
+<?= $form->field($model, 'schedule')->widget(MultipleInput::class, [
     'max' => 4,
     'columns' => [
         [
@@ -205,7 +224,7 @@ use unclead\multipleinput\MultipleInput;
         ],
         [
             'name'  => 'day',
-            'type'  => \kartik\date\DatePicker::className(),
+            'type'  => \kartik\date\DatePicker::class,
             'title' => 'Day',
             'value' => function($data) {
                 return $data['day'];
@@ -235,6 +254,23 @@ use unclead\multipleinput\MultipleInput;
 ```
 更多参考：https://github.com/unclead/yii2-multiple-input
 
+### Select2
+
+```
+use kartik\select2\Select2
+
+// Usage with ActiveForm and model
+echo $form->field($model, 'state_1')->widget(Select2::class, [
+    'data' => $data,
+    'options' => ['placeholder' => 'Select a state ...'],
+    'pluginOptions' => [
+        'allowClear' => true
+    ],
+]);
+```
+
+更多参考：http://demos.krajee.com/widget-details/select2
+
 ### 省市区控件
 
 ```
@@ -253,6 +289,24 @@ use unclead\multipleinput\MultipleInput;
 视图
 
 ```
-<?= $form->field($model, 'content')->widget(\common\widgets\ueditor\UEditor::className()) ?>
+<?= $form->field($model, 'content')->widget(\common\widgets\ueditor\UEditor::class) ?>
+
+// 自定义配置参数用法
+<?= $form->field($model, 'content')->widget(\common\widgets\ueditor\UEditor::class, [
+     'config' => [
+
+      ],
+    'formData' => [
+        'drive' => 'local', // 默认本地 支持qiniu/oss 上传
+        'thumb' => [ // 图片缩略图
+            [
+                'widget' => 100,
+                'height' => 100,
+            ],
+        ]
+    ],
+]) ?>
 ```
+
+更多文档：http://fex.baidu.com/ueditor/#start-start
 

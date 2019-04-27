@@ -41,26 +41,24 @@ class PasswordResetRequestForm extends Model
             'email' => $this->email,
         ]);
 
-        if (!$user) {
+        if (!$user)
+        {
             return false;
         }
         
-        if (!MemberInfo::isPasswordResetTokenValid($user->password_reset_token)) {
+        if (!MemberInfo::isPasswordResetTokenValid($user->password_reset_token))
+        {
             $user->generatePasswordResetToken();
             if (!$user->save()) {
                 return false;
             }
         }
 
-        return Yii::$app
+        $subject = 'Password reset for ' . Yii::$app->name;
+        $template = 'passwordResetToken';
+        // 发送邮件
+        return Yii::$app->services
             ->mailer
-            ->compose(
-                ['html' => 'passwordResetToken-html', 'text' => 'passwordResetToken-text'],
-                ['user' => $user]
-            )
-            ->setFrom([Yii::$app->params['supportEmail'] => Yii::$app->name . ' robot'])
-            ->setTo($this->email)
-            ->setSubject('Password reset for ' . Yii::$app->name)
-            ->send();
+            ->send($user, $this->email, $subject, $template);
     }
 }

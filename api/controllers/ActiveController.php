@@ -2,38 +2,52 @@
 namespace api\controllers;
 
 use Yii;
-use yii\web\Response;
 use yii\filters\Cors;
+use yii\filters\RateLimiter;
 use yii\filters\auth\CompositeAuth;
+use yii\filters\auth\HttpBasicAuth;
+use yii\filters\auth\HttpBearerAuth;
+use yii\filters\auth\HttpHeaderAuth;
 use yii\filters\auth\QueryParamAuth;
 use yii\web\BadRequestHttpException;
+use api\behaviors\HttpSignAuth;
 
 /**
  * Class ActiveController
- * @package common\controllers
+ * @package api\controllers
+ * @author jianyan74 <751393839@qq.com>
  */
 class ActiveController extends \yii\rest\ActiveController
 {
     /**
-     * 普通获取每页数量
+     * 不用进行登录验证的方法
+     * 例如： ['index', 'update', 'create', 'view', 'delete']
+     * 默认全部需要验证
+     *
+     * @var array
+     */
+    protected $optional = [];
+
+    /**
+     * 默认每页数量
      *
      * @var int
      */
-    protected $_pageSize = 10;
+    protected $pageSize = 10;
 
     /**
      * 启始位移
      *
      * @var int
      */
-    protected $_offset = 0;
+    protected $offset = 0;
 
     /**
-     * 获取每页数量
+     * 实际每页数量
      *
      * @var
      */
-    protected $_limit;
+    protected $limit;
 
     /**
      * 行为验证
@@ -44,41 +58,60 @@ class ActiveController extends \yii\rest\ActiveController
     {
         $behaviors = parent::behaviors();
         // 跨域支持
-        $behaviors['class'] = Cors::className();
+        $behaviors['corsFilter'] = [
+            'class' => Cors::class,
+        ];
         $behaviors['authenticator'] = [
-            'class' => CompositeAuth::className(),
+            'class' => CompositeAuth::class,
             'authMethods' => [
-                /* 下面是三种验证access_token方式 */
-                // 1.HTTP 基本认证: access token 当作用户名发送，应用在access token可安全存在API使用端的场景，例如，API使用端是运行在一台服务器上的程序。
-                // \yii\filters\auth\HttpBasicAuth::className(),
-                // 2.OAuth : 使用者从认证服务器上获取基于OAuth2协议的access token，然后通过 HTTP Bearer Tokens 发送到API 服务器。
-                // yii\filters\auth\HttpBearerAuth::className(),
-                // 3.请求参数: access token 当作API URL请求参数发送，这种方式应主要用于JSONP请求，因为它不能使用HTTP头来发送access token
-                // http://rageframe.com/user/index/index?accessToken=123
-                // 4.请求参数: access token 当作API header请求参数发送
-                // yii\filters\auth\HttpHeaderAuth::className(),
+                /**
+                 * 下面是四种验证access_token方式
+                 *
+                 * 1.HTTP 基本认证: access token 当作用户名发送，应用在access token可安全存在API使用端的场景，例如，API使用端是运行在一台服务器上的程序。
+                 * \yii\filters\auth\HttpBasicAuth::class,
+                 *
+                 * 2.OAuth : 使用者从认证服务器上获取基于OAuth2协议的access token，然后通过 HTTP Bearer Tokens 发送到API 服务器。
+                 * header格式：Authorization:Bearer+空格+access-token
+                 * yii\filters\auth\HttpBearerAuth::class,
+                 *
+                 * 3.请求参数 access token 当作API URL请求参数发送，这种方式应主要用于JSONP请求，因为它不能使用HTTP头来发送access token
+                 * http://rageframe.com/user/index/index?access-token=123
+                 *
+                 * 4.请求参数 access token 当作API header请求参数发送
+                 * header格式: X-Api-Key: access-token
+                 * yii\filters\auth\HttpHeaderAuth::class,
+                 */
+                HttpBasicAuth::class,
+                HttpBearerAuth::class,
+                HttpHeaderAuth::class,
                 [
-                    'class' => QueryParamAuth::className(),
+                    'class' => QueryParamAuth::class,
                     'tokenParam' => 'access-token'
                 ],
             ],
             // 不进行认证判断方法
-            'optional' => Yii::$app->params['user.optional'],
+            'optional' => $this->optional,
+        ];
+
+        // 进行签名验证，前提开启了签名验证
+        $behaviors['signTokenValidate'] = [
+            'class' => HttpSignAuth::class,
         ];
 
         /**
-         * false 不开启限制 true开启限制
+         * 请求速率控制
          *
-         * limit部分，速度的设置是在User::getRateLimit($request, $action)
+         * limit部分，速度的设置是在common\models\common\RateLimit::getRateLimit($request, $action)
          * 当速率限制被激活，默认情况下每个响应将包含以下HTTP头发送 目前的速率限制信息：
          * X-Rate-Limit-Limit: 同一个时间段所允许的请求的最大数目;
          * X-Rate-Limit-Remaining: 在当前时间段内剩余的请求的数量;
          * X-Rate-Limit-Reset: 为了得到最大请求数所等待的秒数。
-         * 你可以禁用这些头信息通过配置 yii\filters\RateLimiter::enableRateLimitHeaders 为false, 就像在上面的代码示例所示。
+         * enableRateLimitHeaders：false: 不开启限制 true：开启限制
          */
-        $behaviors['rateLimiter']['enableRateLimitHeaders'] = true;
-        // 定义返回格式是：JSON
-        $behaviors['contentNegotiator']['formats']['text/html'] = Response::FORMAT_JSON;
+        $behaviors['rateLimiter'] = [
+            'class' => RateLimiter::class,
+            'enableRateLimitHeaders' => true,
+        ];
 
         return $behaviors;
     }
@@ -99,12 +132,12 @@ class ActiveController extends \yii\rest\ActiveController
         // 判断验证token有效性是否开启
         if (Yii::$app->params['user.accessTokenValidity'] == true)
         {
-            $token = Yii::$app->request->get('accessToken');
+            $token = Yii::$app->request->get('access-token');
             $timestamp = (int) substr($token, strrpos($token, '_') + 1);
             $expire = Yii::$app->params['user.accessTokenExpire'];
 
             // 验证有效期
-            if ($timestamp + $expire <= time() && !in_array($action->id, Yii::$app->params['user.optional']))
+            if ($timestamp + $expire <= time() && !in_array($action->id, $this->optional))
             {
                 throw new BadRequestHttpException('您的登录验证已经过期，请重新登陆');
             }
@@ -115,8 +148,9 @@ class ActiveController extends \yii\rest\ActiveController
 
         // 分页
         $page = Yii::$app->request->get('page', 1);
-        $this->_limit = Yii::$app->request->get('per-page', $this->_pageSize);
-        $this->_offset = ($page - 1) * $this->_pageSize;
+        $this->limit = Yii::$app->request->get('per-page', $this->pageSize);
+        $this->limit > 100 && $this->limit = 100;
+        $this->offset = ($page - 1) * $this->pageSize;
 
         return true;
     }

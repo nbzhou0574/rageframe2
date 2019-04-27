@@ -1,13 +1,15 @@
 <?php
 namespace common\models\sys;
 
-use common\helpers\StringHelper;
-use Overtrue\Pinyin\Pinyin;
+use common\models\wechat\ReplyAddon;
+use common\models\wechat\Rule;
+use common\models\wechat\RuleKeyword;
 use Yii;
 use common\enums\StatusEnum;
 use common\models\common\BaseModel;
 use common\helpers\AddonHelper;
-use common\helpers\ArrayHelper;
+use common\helpers\StringHelper;
+use Overtrue\Pinyin\Pinyin;
 
 /**
  * This is the model class for table "{{%sys_addons}}".
@@ -85,7 +87,7 @@ class Addons extends BaseModel
             'is_hook' => '钩子',
             'is_rule' => '嵌入规则',
             'is_setting' => '全局设置项',
-            'is_mini_program' => '小程序',
+            'is_mini_program' => 'Api/小程序',
             'status' => '状态',
             'created_at' => '创建时间',
             'updated_at' => '修改时间',
@@ -106,6 +108,9 @@ class Addons extends BaseModel
             ->one();
     }
 
+    /**
+     * @return array
+     */
     public static function getLocalList()
     {
         $addon_dir = Yii::getAlias('@addons');
@@ -160,28 +165,6 @@ class Addons extends BaseModel
     }
 
     /**
-     * 获取菜单导航列表
-     *
-     * @return array|\yii\db\ActiveRecord[]
-     */
-    public static function getListMenu()
-    {
-        $models = self::find()
-            ->where(['status' => StatusEnum::ENABLED])
-            ->with(['bindingMenu'])
-            ->asArray()
-            ->all();
-
-        $addons = [];
-        foreach ($models as $model)
-        {
-            $addons[$model['group']][] = $model;
-        }
-
-        return $addons;
-    }
-
-    /**
      * 编辑信息
      *
      * @param object $addons
@@ -205,6 +188,7 @@ class Addons extends BaseModel
             $model->title_initial = ucwords($pinyin->abbr($title_initial));
         }
 
+        $model->updated_at = time();
         if (!$model->save())
         {
             $error = Yii::$app->debris->analyErr($model->getFirstErrors());
@@ -221,7 +205,27 @@ class Addons extends BaseModel
      */
     public function getBindingMenu()
     {
-        return $this->hasOne(AddonsBinding::className(), ['addons_name' => 'name'])->where(['entry' => 'menu'])->orderBy('id asc');
+        return $this->hasMany(AddonsBinding::class, ['addons_name' => 'name'])->where(['entry' => 'menu'])->orderBy('id asc');
+    }
+
+    /**
+     * 关联首页绑定的菜单
+     *
+     * @return \yii\db\ActiveQuery
+     */
+    public function getBindingIndexMenu()
+    {
+        return $this->hasOne(AddonsBinding::class, ['addons_name' => 'name'])->where(['entry' => 'menu'])->asArray()->orderBy('id asc');
+    }
+
+    /**
+     * 关联绑定的入口
+     *
+     * @return \yii\db\ActiveQuery
+     */
+    public function getBindingCover()
+    {
+        return $this->hasMany(AddonsBinding::class, ['addons_name' => 'name'])->where(['entry' => 'cover'])->orderBy('id asc');
     }
 
     /**
@@ -231,7 +235,27 @@ class Addons extends BaseModel
      */
     public function getBinding()
     {
-        return $this->hasMany(AddonsBinding::className(), ['addons_name' => 'name'])->orderBy('id asc');
+        return $this->hasMany(AddonsBinding::class, ['addons_name' => 'name'])->orderBy('id asc');
+    }
+
+    /**
+     * 关联权限
+     *
+     * @return \yii\db\ActiveQuery
+     */
+    public function getAuthItem()
+    {
+        return $this->hasMany(AddonsAuthItem::class, ['addons_name' => 'name']);
+    }
+
+    /**
+     * 关联权限的菜单
+     *
+     * @return \yii\db\ActiveQuery
+     */
+    public function getAuthItemChild()
+    {
+        return $this->hasOne(AddonsAuthItemChild::class, ['addons_name' => 'name']);
     }
 
     /**
@@ -239,8 +263,20 @@ class Addons extends BaseModel
      */
     public function afterDelete()
     {
+        // 移除绑定的菜单导航
         AddonsBinding::deleteAll(['addons_name' => $this->name]);
-        // Rule::deleteAll($this->name);
+        //权限清理
+        AddonsAuthItemChild::deleteAll(['addons_name' => $this->name]);
+        AddonsAuthItem::deleteAll(['addons_name' => $this->name]);
+        // 移除关键字
+        if ($replys = ReplyAddon::find()->where(['addon' => $this->name])->asArray()->all())
+        {
+            $ruleIds = array_column($replys, 'rule_id');
+            Rule::deleteAll(['in', 'id', $ruleIds]);
+            RuleKeyword::deleteAll(['in', 'rule_id', $ruleIds]);
+        }
+
+        ReplyAddon::deleteAll(['addon' => $this->name]);
         parent::afterDelete();
     }
 }

@@ -15,10 +15,12 @@
 
 参数
 
-参数名 | 参数类型 | 必填 | 默认 | 说明
----|---|---|---|---
-username | string| 是 | 无 | 账号
-password | string| 是 | 无 | 密码
+参数名 | 参数类型 | 必填 | 默认 | 说明 | 备注
+---|---|---|---|---|---
+username | string| 是 | 无 | 账号 |
+password | string| 是 | 无 | 密码 | 
+group | string| 是 | 无 | 组别 | app:app,wechat:微信,miniProgram:小程序
+
 
 返回
 
@@ -48,7 +50,7 @@ password | string| 是 | 无 | 密码
             "address_id": "0",
             "visit_count": 8,
             "home_phone": null,
-            "mobile_phone": null,
+            "mobile": null,
             "role": 10,
             "last_time": 1527339048,
             "last_ip": "127.0.0.1",
@@ -75,9 +77,10 @@ password | string| 是 | 无 | 密码
 
 参数
 
-参数名 | 参数类型 | 必填 | 默认 | 说明
----|---|---|---|---
-refresh_token | string| 是 | 无 | 登录获取到的重置令牌
+参数名 | 参数类型 | 必填 | 默认 | 说明 | 备注
+---|---|---|---|---|---
+refresh_token | string| 是 | 无 | 重置令牌 |
+group | string| 是 | 无 | 组别 | app:app,wechat:微信,miniProgram:小程序
 
 返回
 
@@ -107,7 +110,7 @@ refresh_token | string| 是 | 无 | 登录获取到的重置令牌
             "address_id": "0",
             "visit_count": 9,
             "home_phone": null,
-            "mobile_phone": null,
+            "mobile": null,
             "role": 10,
             "last_time": 1527339061,
             "last_ip": "127.0.0.1",

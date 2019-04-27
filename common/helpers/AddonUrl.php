@@ -9,6 +9,7 @@ use yii\helpers\Url;
  *
  * Class AddonUrl
  * @package common\helpers
+ * @author jianyan74 <751393839@qq.com>
  */
 class AddonUrl
 {
@@ -24,7 +25,7 @@ class AddonUrl
      * @param bool $scheme
      * @return bool| string
      */
-    public static function to(array $url, $scheme = false)
+    public static function to($url, $scheme = false)
     {
         return urldecode(Url::to(self::regroupUrl($url), $scheme));
     }
@@ -87,10 +88,15 @@ class AddonUrl
      */
     protected static function regroupUrl($url)
     {
+        if (!is_array($url))
+        {
+            return $url;
+        }
+
         $addonsUrl = [];
         $addonsUrl[0] = self::ADDON_EXECUTE;
         $addonsUrl['route'] = self::regroupRoute($url);
-        $addonsUrl['addon'] = Yii::$app->params['addonInfo']['name'];
+        $addonsUrl['addon'] = StringHelper::toUnderScore(Yii::$app->params['addonInfo']['name']);
 
         // 删除默认跳转url
         unset($url[0]);
@@ -108,17 +114,19 @@ class AddonUrl
      * @param array $url
      * @return string
      */
-    protected static function regroupRoute($url)
+    public static function regroupRoute($url)
     {
         $oldRoute = Yii::$app->params['addonInfo']['oldRoute'];
 
         $route = $url[0];
         // 如果只填写了方法转为控制器方法
-        if (count(explode('/',$route)) < 2)
+        if (count(explode('/', $route)) < 2)
         {
             $oldRoute = explode('/', $oldRoute);
-            $oldRoute[1] = $url[0];
+            $oldRoute[count($oldRoute) - 1] = $url[0];
             $route = implode('/', $oldRoute);
+
+            unset($oldRoute);
         }
 
         return $route;
